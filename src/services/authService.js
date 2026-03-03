@@ -27,6 +27,9 @@ class AuthService {
    */
   async signIn(accessToken) {
     try {
+      const isLocalDev =
+        typeof window !== 'undefined' && window.location.hostname === 'localhost';
+
       if (!accessToken) {
         throw new Error('No access token provided');
       }
@@ -64,12 +67,16 @@ class AuthService {
         throw new Error('No email found in Google profile');
       }
       // Step 2: Domain restriction
-      if (!email.endsWith('@reyanshelectronics.com') && !config.useLocalStorage) {
+      if (
+        !email.endsWith('@reyanshelectronics.com') &&
+        !config.useLocalStorage &&
+        !isLocalDev
+      ) {
         throw new Error('Only @reyanshelectronics.com users are allowed');
       }
 
-      // Step 4: LocalStorage mode – mock user
-      if (config.useLocalStorage) {
+      // Step 4: Local development / LocalStorage mode – mock user from Google profile
+      if (config.useLocalStorage || isLocalDev) {
         this.currentUser = {
           email,
           name: profile.name,

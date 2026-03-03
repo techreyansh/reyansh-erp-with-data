@@ -36,8 +36,7 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 import LoadingSpinner from "../common/LoadingSpinner";
-import oauthConfig from "../../config/oauthConfig";
-import config from "../../config/config";
+import { supabase } from "../../lib/supabaseClient";
 
 // Extracted role options for easier management and cleaner JSX
 const ROLE_OPTIONS = [
@@ -62,16 +61,13 @@ const Login = () => {
   
   // useAuth provides authentication methods and state
   const {
-    signIn,
-    mockLogin,
-    directLogin,
-    debugOAuth,
+    signInWithGoogle,
     loading: authLoading,
     isAuthenticated,
+    error: authError,
   } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState(null);
-  const [mockRole, setMockRole] = useState(ROLE_OPTIONS[0]);
   const [loading, setLoading] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState(null);
@@ -91,204 +87,26 @@ const Login = () => {
     if (isAuthenticated) navigate("/dashboard");
   }, [isAuthenticated, navigate]);
 
-  // Setup Google OAuth token client on mount
-  useEffect(() => {
-    // Clear any existing error messages when component mounts
+  const handleGoogleSignIn = async () => {
     setError(null);
-    
-    if (!window.google) {
-      console.error('Google Identity Services not loaded');
-      setError('Google Identity Services not loaded. Please refresh the page.');
-      return;
-    }
-    
+    setLoading(true);
     try {
-      const redirectUri = oauthConfig.getRedirectUri();
-      // Clear any existing token client to ensure fresh initialization
-      if (window.tokenClient) {
-        window.tokenClient = null;
-      }
-      
-      window.tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: oauthConfig.clientId,
-        scope: oauthConfig.scopes.join(" "),
-        redirect_uri: redirectUri,
-        error_callback: (error) => {
-          // Handle popup closure gracefully - this is a user action, not a critical error
-          if (error && (error.type === 'popup_closed' || error.message?.includes('Popup window closed') || error.message?.includes('popup_closed'))) {
-            console.log('OAuth popup was closed by user');
-            // Don't set error for popup closure - user just cancelled
-            return;
-          } else {
-            console.error('Google OAuth error in Login:', error);
-            const errorMessage = error?.message || error?.type || 'OAuth authentication failed';
-            setError(errorMessage);
-          }
-        },
-        callback: async (tokenResponse) => {
-          if (tokenResponse?.access_token) {
-            setError(null);
-            setLoading(true);
-            try {
-              await signIn(tokenResponse.access_token);
-              navigate("/dashboard");
-            } catch (err) {
-              console.error('Sign-in error:', err);
-              let errorMessage = err.message || "Failed to sign in with Google";
-              
-              // Provide more specific error messages
-              if (err.message.includes('401')) {
-                errorMessage = "Authentication failed. Please try signing in again.";
-              } else if (err.message.includes('403')) {
-                errorMessage = "Permission denied. Please grant all requested permissions when signing in.";
-              } else if (err.message.includes('domain')) {
-                errorMessage = "Only @reyanshelectronics.com email addresses are allowed.";
-              } else if (err.message.includes('not found')) {
-                errorMessage = "User not found in the system. Please contact your administrator.";
-              } else if (err.message.includes('redirect_uri_mismatch')) {
-                errorMessage = "OAuth redirect URI mismatch. Please check your Google Cloud Console configuration.";
-              }
-              
-              setError(errorMessage);
-            } finally {
-              setLoading(false);
-            }
-          } else if (tokenResponse?.error) {
-            // Handle OAuth errors
-            console.error('OAuth error response:', tokenResponse);
-            let errorMessage = "OAuth authentication failed";
-            
-            if (tokenResponse.error === 'popup_closed_by_user') {
-              errorMessage = "Sign-in was cancelled. Please try again.";
-            } else if (tokenResponse.error === 'access_denied') {
-              errorMessage = "Access was denied. Please grant all requested permissions.";
-            } else if (tokenResponse.error === 'invalid_request') {
-              errorMessage = "Invalid OAuth request. Please check your configuration.";
-            }
-            
-            setError(errorMessage);
-          } else {
-            setError("Failed to get access token from Google.");
-          }
+      const { error: signInError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
         },
       });
-    } catch (error) {
-      console.error('Error initializing Google OAuth client:', error);
-      setError('Failed to initialize Google OAuth client. Please refresh the page.');
-    }
-  }, [signIn, navigate]);
-
-  // Google Sign-In handler
-  const handleGoogleSignIn = () => {
-    try {
-      // Clear any previous errors
-      setError(null);
-      
-      // Check if Google Identity Services is loaded
-      if (!window.google) {
-        setError('Google Identity Services not loaded. Please refresh the page and try again.');
-        console.error('Google Identity Services not available');
-        return;
+      if (signInError) {
+        console.error("Supabase OAuth error:", signInError);
+        setError("Failed to sign in with Google");
       }
-
-      // Check if Google Accounts is available
-      if (!window.google.accounts) {
-        setError('Google Accounts not available. Please refresh the page and try again.');
-        console.error('Google Accounts not available');
-        return;
-      }
-
-      // Check if OAuth client is initialized
-      if (!window.tokenClient) {
-        setError('OAuth client not initialized. Please refresh the page and try again.');
-        console.error('OAuth client not initialized');
-        return;
-      }
-
-      // Log OAuth configuration for debugging
-      const redirectUri = oauthConfig.getRedirectUri();
-      
-      // Validate OAuth configuration
-      if (!oauthConfig.clientId) {
-        setError('OAuth client ID not configured. Please check your configuration.');
-        console.error('OAuth client ID missing');
-        return;
-      }
-
-      if (!redirectUri) {
-        setError('OAuth redirect URI not configured. Please check your configuration.');
-        console.error('OAuth redirect URI missing');
-        return;
-      }
-
-      // Check if we're on the correct domain for OAuth
-      const currentHostname = window.location.hostname;
-      const isLocalhost = currentHostname === 'localhost';
-      const isVercel = currentHostname.includes('vercel.app');
-      
-      if (!isLocalhost && !isVercel) {
-        console.warn('Warning: OAuth may not work on this domain:', currentHostname);
-      }
-
-      // Request access token with proper error handling
-      try {
-        // Force consent prompt to ensure user re-authenticates
-        window.tokenClient.requestAccessToken({ prompt: 'consent' });
-      } catch (oauthError) {
-        console.error('Error requesting access token:', oauthError);
-        setError(`OAuth request failed: ${oauthError.message || 'Unknown error'}`);
-      }
-
-    } catch (error) {
-      console.error('Error in handleGoogleSignIn:', error);
-      setError(`Sign-in error: ${error.message || 'Unknown error occurred'}`);
+    } catch (e) {
+      console.error("Error starting Supabase OAuth:", e);
+      setError("Failed to sign in with Google");
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // Mock login handler
-  const handleMockSignIn = () => {
-    setError(null);
-    mockLogin(mockRole);
-    navigate("/dashboard");
-  };
-
-  // Direct CEO login handler
-  const handleCEOLogin = () => {
-    setError(null);
-    directLogin('abhishek@reyanshelectronics.com', 'CEO');
-    navigate("/dashboard");
-  };
-
-  // Validate OAuth configuration
-  const validateOAuthConfig = () => {
-    const issues = [];
-    
-    if (!window.google) {
-      issues.push('Google Identity Services not loaded');
-    }
-    
-    if (!window.google?.accounts) {
-      issues.push('Google Accounts not available');
-    }
-    
-    if (!window.tokenClient) {
-      issues.push('OAuth client not initialized');
-    }
-    
-    if (!oauthConfig.clientId) {
-      issues.push('OAuth client ID not configured');
-    }
-    
-    const redirectUri = oauthConfig.getRedirectUri();
-    if (!redirectUri) {
-      issues.push('OAuth redirect URI not configured');
-    }
-    
-    return {
-      isValid: issues.length === 0,
-      issues,
-      redirectUri
-    };
   };
 
   // Show loading spinner if authenticating
@@ -627,7 +445,7 @@ const Login = () => {
                     )}
 
                     {/* Error alert */}
-                    {error && (
+                    {(error || authError) && (
                       <Grow in timeout={200}>
                         <Alert 
                           severity="error" 
@@ -637,7 +455,7 @@ const Login = () => {
                             "& .MuiAlert-icon": { fontSize: 24 }
                           }}
                         >
-                          {error}
+                          {error || authError}
                         </Alert>
                       </Grow>
                     )}

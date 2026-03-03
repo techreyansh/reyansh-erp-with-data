@@ -51,31 +51,46 @@ export function calculateBatchesForPOs(
     }
     productMap[po.ProductCode] += Number(po.Quantity || 0);
   });
-  
+
+  // If we're dispatching a single specific item, treat it as a single batch
+  // so the user picks ONE dispatch date for the whole quantity.
   let allBatches = [];
-  Object.entries(productMap).forEach(([productCode, qty]) => {
-    const po = undeliveredPOs.find((po) => po.ProductCode === productCode);
-    let batchSize = 4000;
-    if (
-      po &&
-      po.BatchSize &&
-      !isNaN(Number(po.BatchSize)) &&
-      Number(po.BatchSize) > 0
-    ) {
-      batchSize = parseInt(po.BatchSize, 10);
-    }
-    const numBatches = Math.ceil(qty / batchSize);
-    for (let i = 0; i < numBatches; i++) {
+  if (specificUniqueId) {
+    Object.entries(productMap).forEach(([productCode, qty]) => {
       allBatches.push({
         productCode,
-        batchNumber: i + 1,
-        batchSize: i === numBatches - 1 ? qty - batchSize * i : batchSize,
+        batchNumber: 1,
+        batchSize: qty,
         date: "",
         time: "",
       });
-    }
-  });
-  
+    });
+  } else {
+    // Original logic: split into multiple batches based on BatchSize
+    Object.entries(productMap).forEach(([productCode, qty]) => {
+      const po = undeliveredPOs.find((po) => po.ProductCode === productCode);
+      let batchSize = 4000;
+      if (
+        po &&
+        po.BatchSize &&
+        !isNaN(Number(po.BatchSize)) &&
+        Number(po.BatchSize) > 0
+      ) {
+        batchSize = parseInt(po.BatchSize, 10);
+      }
+      const numBatches = Math.ceil(qty / batchSize);
+      for (let i = 0; i < numBatches; i++) {
+        allBatches.push({
+          productCode,
+          batchNumber: i + 1,
+          batchSize: i === numBatches - 1 ? qty - batchSize * i : batchSize,
+          date: "",
+          time: "",
+        });
+      }
+    });
+  }
+
   return {
     batches: allBatches,
     totalQuantity: Object.values(productMap).reduce((sum, qty) => sum + qty, 0),

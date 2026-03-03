@@ -3,7 +3,6 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Box, Typography, Paper } from '@mui/material';
 import { Lock } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
-import authService from '../../services/authService';
 import ceoDashboardAccessLog from '../../services/ceoDashboardAccessLog';
 
 /**
@@ -12,18 +11,18 @@ import ceoDashboardAccessLog from '../../services/ceoDashboardAccessLog';
  * All access attempts are logged. Backend must validate CEO role server-side when APIs exist.
  */
 const CEOOnlyRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, role, loading } = useAuth();
   const location = useLocation();
   const logged = useRef(false);
 
   useEffect(() => {
     if (loading || !user) return;
-    const granted = authService.hasRole('CEO');
+    const granted = role === 'CEO';
     if (!logged.current) {
       ceoDashboardAccessLog.logAccessAttempt({
         granted,
         userId: user.email ?? user.id,
-        userRole: user.role ?? null,
+        userRole: role ?? null,
       });
       logged.current = true;
     }
@@ -41,7 +40,7 @@ const CEOOnlyRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!authService.hasRole('CEO')) {
+  if (role !== 'CEO') {
     return (
       <Box
         sx={{

@@ -1,16 +1,27 @@
-import authService from '../services/authService';
+import { supabase } from '../lib/supabaseClient';
 
-/**
- * Backend-level role validation for CEO-only resources.
- * Use in API calls or server middleware when CEO dashboard / master control APIs are implemented.
- * Frontend route protection is in CEOOnlyRoute; this utility is for consistent CEO checks.
- */
-export const requireCEORole = () => {
-  const isCEO = authService.hasRole('CEO');
-  if (!isCEO) {
+export const requireCEORole = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session?.user?.email) {
+    throw new Error('Access Denied – Not authenticated');
+  }
+  const email = data.session.user.email;
+  const { data: row, error: dbError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('email', email)
+    .maybeSingle();
+  if (dbError || !row || row.role !== 'CEO') {
     throw new Error('Access Denied – Insufficient Privileges');
   }
   return true;
 };
 
-export const isCEORole = () => authService.hasRole('CEO');
+export const isCEORole = async () => {
+  try {
+    await requireCEORole();
+    return true;
+  } catch {
+    return false;
+  }
+};

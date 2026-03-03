@@ -1,142 +1,149 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import authService from '../services/authService';
+import { supabase } from '../lib/supabaseClient';
 
-// Create auth context
 const AuthContext = createContext();
 
-// Auth provider component
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null); // Supabase user
+  const [role, setRole] = useState(null); // Role from public.users
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchRoleForEmail = async (email) => {
+    if (!email) {
+      setRole(null);
+      return;
+    }
+    try {
+      const { data, error: dbError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('email', email)
+        .single();
+
+      if (dbError) {
+        console.error('Error fetching role from users table:', dbError);
+        setError('Failed to load user role');
+        setRole(null);
+        return;
+      }
+
+      if (!data || !data.role) {
+        console.warn('No matching user/role found for email:', email);
+        setError('Your account is not authorized to access this app.');
+        setRole(null);
+        return;
+      }
+
+      setRole(data.role);
+      setError(null);
+    } catch (e) {
+      console.error('Unexpected error fetching role:', e);
+      setError('Failed to load user role');
+      setRole(null);
+    }
+  };
 
   useEffect(() => {
-    // Check if user is already authenticated and validate token
-    const checkAuth = async () => {
+    let mounted = true;
+
+    const initAuth = async () => {
+      setLoading(true);
       try {
-        const currentUser = authService.getCurrentUser();
-        
-        if (currentUser) {
-          // Validate the token is still valid
-          const isTokenValid = await authService.validateToken();
-          
-          if (!isTokenValid) {
-            await authService.signOut();
-            setUser(null);
-          } else {
-            setUser(currentUser);
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error('Error getting Supabase session:', sessionError);
+          setUser(null);
+          setRole(null);
+          setError('Authentication error');
+        } else if (data.session?.user) {
+          const supaUser = data.session.user;
+          if (mounted) {
+            setUser(supaUser);
+            await fetchRoleForEmail(supaUser.email);
           }
         } else {
           setUser(null);
+          setRole(null);
+          setError(null);
         }
-      } catch (error) {
-        console.error('Error checking auth:', error);
+      } catch (e) {
+        console.error('Error initializing auth:', e);
         setUser(null);
+        setRole(null);
+        setError('Authentication error');
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
-    checkAuth();
+    initAuth();
 
-    // Set up periodic token validation
-    // Tokens expire after 10 hours, so we check every 9 hours to catch expiration before it happens
-    const tokenCheckInterval = setInterval(async () => {
-      const currentUser = authService.getCurrentUser();
-      if (currentUser) {
-        const isTokenValid = await authService.validateToken();
-        if (!isTokenValid) {
-          await authService.signOut();
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          const supaUser = session?.user || null;
+          setUser(supaUser);
+          if (supaUser?.email) {
+            await fetchRoleForEmail(supaUser.email);
+          }
+        } else if (event === 'SIGNED_OUT') {
           setUser(null);
-          // Redirect to login with session expired flag
-          window.location.href = '/login?session_expired=true';
+          setRole(null);
+          setError(null);
         }
       }
-    }, 9 * 60 * 60 * 1000); // Check every 9 hours (32400000ms) - tokens expire after 10 hours
+    );
 
-    // Cleanup interval on unmount
-    return () => clearInterval(tokenCheckInterval);
+    return () => {
+      mounted = false;
+      listener?.subscription?.unsubscribe();
+    };
   }, []);
 
-  // Sign in handler
-  const signIn = async (credential) => {
-    try {
-      setLoading(true);
-      const user = await authService.signIn(credential);
-      setUser(user);
-      return user;
-    } catch (error) {
-      console.error('Error signing in:', error);
-      throw error;
-    } finally {
-      setLoading(false);
+  const signInWithGoogle = async () => {
+    setError(null);
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (signInError) {
+      console.error('Supabase OAuth sign-in error:', signInError);
+      setError('Failed to sign in with Google');
     }
   };
 
-  // Sign out handler
   const signOut = async () => {
     try {
       setLoading(true);
-      await authService.signOut();
+      await supabase.auth.signOut();
       setUser(null);
-      
-      // Force page reload to ensure complete cleanup and prevent any cached state
-      // This ensures the user will be required to sign in again
+      setRole(null);
+      setError(null);
       window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);
-      // Even if there's an error, clear the user state and redirect
       setUser(null);
+      setRole(null);
       window.location.href = '/login';
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock login for development
-  const mockLogin = (role) => {
-    try {
-      setLoading(true);
-      const user = authService.mockLogin(role);
-      setUser(user);
-      return user;
-    } catch (error) {
-      console.error('Error mock login:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Direct login handler
-  const directLogin = (email, role = 'CEO') => {
-    try {
-      setLoading(true);
-      const user = authService.directLogin(email, role);
-      setUser(user);
-      return user;
-    } catch (error) {
-      console.error('Error direct login:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Debug OAuth handler
-  const debugOAuth = () => {
-    return authService.debugOAuth();
-  };
-
-  // Context value
   const value = {
     user,
+    role,
     loading,
-    signIn,
+    error,
+    signInWithGoogle,
     signOut,
-    mockLogin,
-    directLogin,
-    debugOAuth,
-    isAuthenticated: !!user
+    isAuthenticated: !!user && !!role,
+    hasRole: (requiredRole) =>
+      !!role && !!requiredRole && String(role).trim() === String(requiredRole).trim(),
   };
 
   return (

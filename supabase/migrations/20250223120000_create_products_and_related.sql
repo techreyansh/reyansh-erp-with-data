@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS public.product_categories (
   description text
 );
 
+-- Make sure slug exists even if an older version of the table was created without it
+ALTER TABLE public.product_categories
+  ADD COLUMN IF NOT EXISTS slug text;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_product_categories_slug
   ON public.product_categories (slug)
   WHERE deleted_at IS NULL;
