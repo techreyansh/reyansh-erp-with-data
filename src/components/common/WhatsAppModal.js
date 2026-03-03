@@ -33,16 +33,8 @@ import { useAuth } from '../../context/AuthContext';
 import whatsappMessageService from '../../services/whatsappMessageService';
 import whatsappLogService from '../../services/whatsappLogService';
 
-const WhatsAppModal = ({
-  open,
-  onClose,
-  task,
-  stageName,
-  status,
-  onMessageSent
-}) => {
-  const { user } = useAuth(); // ✅ FIXED
-
+const WhatsAppModal = ({ open, onClose, task, stageName, status, onMessageSent }) => {
+  const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [recipients, setRecipients] = useState([]);
   const [sendToCustomer, setSendToCustomer] = useState(true);
