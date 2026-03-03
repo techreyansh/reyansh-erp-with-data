@@ -4,93 +4,91 @@ import { supabase } from '../lib/supabaseClient';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // Supabase user
-  const [role, setRole] = useState(null); // Role from public.users
+  const [user, setUser] = useState(null); // { id, email, role, roleCode } from public.users + roles
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchRoleForEmail = async (email) => {
-    if (!email) {
-      setRole(null);
+  const loadUserWithRole = async (session) => {
+    if (!session?.user?.id) {
+      setUser(null);
+      setError(null);
       return;
     }
     try {
       const { data, error: dbError } = await supabase
         .from('users')
-        .select('role')
-        .eq('email', email)
+        .select(`
+          id,
+          email,
+          roles (
+            id,
+            name,
+            code
+          )
+        `)
+        .eq('id', session.user.id)
         .single();
 
       if (dbError) {
-        console.error('Error fetching role from users table:', dbError);
+        console.error('Role fetch error:', dbError);
         setError('Failed to load user role');
-        setRole(null);
+        setUser(null);
         return;
       }
 
-      if (!data || !data.role) {
-        console.warn('No matching user/role found for email:', email);
+      if (!data || !data.roles) {
         setError('Your account is not authorized to access this app.');
-        setRole(null);
+        setUser(null);
         return;
       }
 
-      setRole(data.role);
+      setUser({
+        id: data.id,
+        email: data.email,
+        role: data.roles?.name ?? null,
+        roleCode: data.roles?.code ?? null,
+      });
       setError(null);
     } catch (e) {
-      console.error('Unexpected error fetching role:', e);
+      console.error('Unexpected error loading user/role:', e);
       setError('Failed to load user role');
-      setRole(null);
+      setUser(null);
     }
   };
 
   useEffect(() => {
     let mounted = true;
 
-    const initAuth = async () => {
+    const init = async () => {
       setLoading(true);
       try {
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) {
-          console.error('Error getting Supabase session:', sessionError);
+        const { data } = await supabase.auth.getSession();
+        if (data.session && mounted) {
+          await loadUserWithRole(data.session);
+        } else if (mounted) {
           setUser(null);
-          setRole(null);
-          setError('Authentication error');
-        } else if (data.session?.user) {
-          const supaUser = data.session.user;
-          if (mounted) {
-            setUser(supaUser);
-            await fetchRoleForEmail(supaUser.email);
-          }
-        } else {
-          setUser(null);
-          setRole(null);
           setError(null);
         }
       } catch (e) {
         console.error('Error initializing auth:', e);
-        setUser(null);
-        setRole(null);
-        setError('Authentication error');
+        if (mounted) {
+          setUser(null);
+          setError('Authentication error');
+        }
       } finally {
         if (mounted) setLoading(false);
       }
     };
 
-    initAuth();
+    init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         if (!mounted) return;
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          const supaUser = session?.user || null;
-          setUser(supaUser);
-          if (supaUser?.email) {
-            await fetchRoleForEmail(supaUser.email);
-          }
-        } else if (event === 'SIGNED_OUT') {
+        if (session) {
+          await loadUserWithRole(session);
+        } else {
           setUser(null);
-          setRole(null);
           setError(null);
         }
       }
@@ -121,18 +119,18 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       await supabase.auth.signOut();
       setUser(null);
-      setRole(null);
       setError(null);
       window.location.href = '/login';
-    } catch (error) {
-      console.error('Error signing out:', error);
+    } catch (err) {
+      console.error('Error signing out:', err);
       setUser(null);
-      setRole(null);
       window.location.href = '/login';
     } finally {
       setLoading(false);
     }
   };
+
+  const role = user?.role ?? null;
 
   const value = {
     user,
@@ -141,9 +139,9 @@ export const AuthProvider = ({ children }) => {
     error,
     signInWithGoogle,
     signOut,
-    isAuthenticated: !!user && !!role,
+    isAuthenticated: !!user && !!user?.role,
     hasRole: (requiredRole) =>
-      !!role && !!requiredRole && String(role).trim() === String(requiredRole).trim(),
+      !!role && !!requiredRole && (String(role).trim() === String(requiredRole).trim() || String(user?.roleCode ?? '').trim() === String(requiredRole).trim()),
   };
 
   return (
