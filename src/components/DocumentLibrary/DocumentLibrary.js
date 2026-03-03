@@ -152,12 +152,7 @@ const DocumentLibrary = () => {
     loadDocuments();
   }, [currentPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Check if user has CEO role
-  const getUserRole = () => {
-    return user?.role || 'Employee';
-  };
-  
-  const userRole = getUserRole();
+  const userRole = user?.role || 'Employee';
   
   // Redirect if not CEO
   if (userRole !== 'CEO') {
