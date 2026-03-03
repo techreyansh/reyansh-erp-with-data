@@ -1,29 +1,21 @@
-import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
-export const getCurrentUser = async () => {
-  const { user, role } = useAuth();
-  if (error || !data.session?.user) return null;
-  return data.session.user;
+export const useCurrentUser = () => {
+  const { user } = useAuth();
+  return user || null;
 };
 
-export const isAuthenticated = async () => {
-  const user = await getCurrentUser();
+export const useIsAuthenticated = () => {
+  const { user } = useAuth();
   return !!user;
 };
 
-export const getUserRole = () => {
-  // Prefer role from context; this helper is kept for backward compatibility.
-  // New code should use useAuth().role instead.
-  console.warn('getUserRole from authUtils is deprecated. Use useAuth().role instead.');
-  return null;
+export const useUserRole = () => {
+  const { role } = useAuth();
+  return role;
 };
 
-export const hasRole = async (role) => {
-  console.warn('hasRole from authUtils is deprecated. Use useAuth().hasRole instead.');
-  return false;
-};
-
-export const hasPermission = async () => {
-  // Permissions are handled at the app level; this is a no-op placeholder.
-  return false;
+export const useHasRole = (requiredRole) => {
+  const { role } = useAuth();
+  return role === requiredRole;
 };
