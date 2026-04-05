@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Box, 
-  Container, 
   Typography, 
   Paper, 
   Stepper, 
@@ -50,7 +49,6 @@ import config from '../../config/config';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import CircleIcon from '@mui/icons-material/Circle';
-import PurchaseFlowSubheader from './PurchaseFlowSubheader';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ExpandMore, 
@@ -1171,160 +1169,9 @@ const PurchaseFlow = () => {
   // Debug logs for filtering
 
   return (
-    <Box 
-      sx={{ 
-        width: "100%",
-        minHeight: "100vh",
-        backgroundColor: theme.palette.grey[50],
-      }}
-    >
-      {/* Modern Header Section */}
-      <Paper 
-        elevation={0}
-        sx={{ 
-          background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-          color: "white",
-          borderRadius: 0,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Background Pattern */}
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-            opacity: 0.3,
-          }}
-        />
-        
-        <Container maxWidth={false} sx={{ position: "relative", zIndex: 1, px: { xs: 2, md: 3 } }}>
-          <Box sx={{ py: { xs: 4, sm: 6, md: 8 } }}>
-            <Fade in timeout={800}>
-              <Stack direction={{ xs: "column", md: "row" }} alignItems="center" spacing={4}>
-                <Box 
-                  sx={{ 
-                    p: 3, 
-                    borderRadius: 3, 
-                    backgroundColor: alpha("#ffffff", 0.15),
-                    backdropFilter: "blur(20px)",
-                    border: `1px solid ${alpha("#ffffff", 0.2)}`,
-                  }}
-                >
-                  <PurchaseIcon sx={{ fontSize: { xs: 48, sm: 56, md: 64 }, color: "#ffffff" }} />
-                </Box>
-                
-                <Box sx={{ textAlign: { xs: "center", md: "left" } }}>
-                  <Typography 
-                    variant="h2" 
-                    gutterBottom 
-                    sx={{ 
-                      fontWeight: 800,
-                      textShadow: "0 4px 8px rgba(0,0,0,0.3)",
-                      mb: 2,
-                      fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
-                      letterSpacing: "-0.02em",
-                    }}
-                  >
-                    Purchase Flow Management
-                  </Typography>
-                  <Typography 
-                    variant="h5" 
-                    sx={{ 
-                      opacity: 0.95,
-                      fontWeight: 400,
-                      mb: 3,
-                      fontSize: { xs: '1.1rem', sm: '1.25rem' },
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    Streamlined procurement workflow from indent to payment
-                  </Typography>
-                  
-                  <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: "center", md: "flex-start" }}>
-                    {["Vendor Management", "Smart Procurement", "Cost Optimization"].map((feature, index) => (
-                      <Chip 
-                        key={index}
-                        label={feature} 
-                        sx={{ 
-                          backgroundColor: alpha("#ffffff", 0.2), 
-                          color: "#ffffff",
-                          fontWeight: 600,
-                          backdropFilter: "blur(10px)",
-                          border: `1px solid ${alpha("#ffffff", 0.3)}`,
-                        }} 
-                      />
-                    ))}
-                  </Stack>
-                </Box>
-              </Stack>
-            </Fade>
-          </Box>
-        </Container>
-        
-        {/* Enhanced Tabs - Sticky Navigation */}
-        <Box 
-          sx={{ 
-            backgroundColor: alpha("#000000", 0.1), 
-            backdropFilter: "blur(10px)",
-            position: "sticky",
-            top: 64,
-            zIndex: 200,
-            borderBottom: "1px solid",
-            borderColor: alpha("#ffffff", 0.2),
-          }}
-        >
-          <Container maxWidth={false} sx={{ px: { xs: 2, md: 3 } }}>
-            <Tabs
-              value={trackerTab}
-              onChange={(_, v) => {
-                const route = tabIndexToRoute[v];
-                if (route) {
-                  navigate(route);
-                }
-              }}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ 
-                minHeight: 80,
-                '& .MuiTab-root': {
-                  minHeight: 80,
-                  color: alpha("#ffffff", 0.8),
-                  fontWeight: 600,
-                  textTransform: "none",
-                  fontSize: "0.95rem",
-                  px: 3,
-                  py: 2,
-                  '&.Mui-selected': {
-                    color: "#ffffff",
-                    backgroundColor: alpha("#ffffff", 0.15),
-                  },
-                  '&:hover': {
-                    backgroundColor: alpha("#ffffff", 0.08),
-                  },
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: "#ffffff",
-                  height: 3,
-                  borderRadius: "3px 3px 0 0",
-                },
-              }}
-            >
-              {stepNames.map((name, idx) => (
-                <Tab key={name} label={name} value={idx} />
-              ))}
-            </Tabs>
-          </Container>
-        </Box>
-      </Paper>
-
-      {/* Main Content */}
-      <Container maxWidth={false} sx={{ px: { xs: 2, md: 3 } }}>
-        <Box sx={{ py: { xs: 3, sm: 4, md: 6 } }}>
+    <Box sx={{ width: '100%' }}>
+      {/* Hero + step tabs live in PurchaseFlowLayout (parent <Outlet />); avoid duplicating them here */}
+      <Box sx={{ py: { xs: 1, sm: 2 } }}>
           <Slide direction="left" in timeout={600}>
             <Box>
               {trackerTab === 0 && <PurchaseDashboard />}
@@ -1337,27 +1184,7 @@ const PurchaseFlow = () => {
         {/* Purchase Flow Tracker */}
         <Box sx={{ mb: 4 }}>
           <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: 2 }}>
-            <Tabs
-              value={trackerTab}
-              onChange={(_, v) => {
-                const route = tabIndexToRoute[v];
-                if (route) {
-                  navigate(route);
-                }
-              }}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
-            >
-              {stepNames.map((name, idx) => (
-                <Tab 
-                  key={name} 
-                  label={idx === 0 ? name : `Step ${idx}: ${name}`} 
-                  value={idx} 
-                  sx={{ fontWeight: 600, fontSize: 15 }} 
-                />
-              ))}
-            </Tabs>
+            {/* Step navigation is in PurchaseFlowLayout — no second tab row here */}
             {/* Show form for Tab 1 (Raise Indent) if user is authorized */}
             {trackerTab === 1 && (user?.role === 'Store Manager' || user?.role === 'Store/Dept Head') && (
               <Box sx={{ mb: 3 }}>
@@ -2675,8 +2502,7 @@ const PurchaseFlow = () => {
             </Box>
           </Slide>
         </Box>
-      </Container>
-      
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

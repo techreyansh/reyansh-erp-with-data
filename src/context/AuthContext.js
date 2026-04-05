@@ -1,23 +1,37 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import {
+  parseOAuthErrorFromWindow,
+  clearOAuthCallbackFromBrowserUrl,
+  googleOAuthExchangeFailureHint,
+} from '../lib/oauthCallbackParams';
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // { id, email, role, roleCode } from public.users + roles
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+function mapSessionToUser(sessionUser) {
+  if (!sessionUser) return null;
+  return {
+    id: sessionUser.id,
+    email: sessionUser.email ?? sessionUser.user_metadata?.email ?? '',
+    role: null,
+    roleCode: null,
+  };
+}
 
-  const loadUserWithRole = async (session) => {
-    if (!session?.user?.id) {
-      setUser(null);
-      setError(null);
-      return;
-    }
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [error, setError] = useState(null);
+  /** True when URL had ?error= from Supabase OAuth redirect — skip spinner on / and go straight to login. */
+  const [oauthCallbackHadError, setOauthCallbackHadError] = useState(false);
+
+  const enrichRole = useCallback(async (userId) => {
+    if (!userId) return;
     try {
       const { data, error: dbError } = await supabase
         .from('users')
-        .select(`
+        .select(
+          `
           id,
           email,
           roles (
@@ -25,108 +39,157 @@ export const AuthProvider = ({ children }) => {
             name,
             code
           )
-        `)
-        .eq('id', session.user.id)
+        `
+        )
+        .eq('id', userId)
         .single();
 
       if (dbError) {
         console.error('Role fetch error:', dbError);
-        setError('Failed to load user role');
-        setUser(null);
+        setError('Could not load your profile. You are still signed in.');
         return;
       }
 
-      if (!data || !data.roles) {
-        setError('Your account is not authorized to access this app.');
-        setUser(null);
+      if (!data?.roles) {
+        setError('Your account has no role assigned yet. Contact an administrator.');
         return;
       }
 
-      setUser({
-        id: data.id,
-        email: data.email,
-        role: data.roles?.name ?? null,
-        roleCode: data.roles?.code ?? null,
-      });
+      setUser((prev) =>
+        prev && prev.id === userId
+          ? {
+              ...prev,
+              role: data.roles?.name ?? null,
+              roleCode: data.roles?.code ?? null,
+            }
+          : prev
+      );
       setError(null);
     } catch (e) {
       console.error('Unexpected error loading user/role:', e);
-      setError('Failed to load user role');
-      setUser(null);
+      setError('Could not load your profile. You are still signed in.');
     }
-  };
+  }, []);
+
+  /** Ensures React `user` matches Supabase. Returns true if a session exists. */
+  const syncUserFromSupabase = useCallback(async () => {
+    let session = null;
+    for (let i = 0; i < 8; i++) {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) console.error('getSession (sync):', sessionError);
+      session = data.session ?? null;
+      if (session?.user) break;
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    console.log('SESSION (sync):', session);
+    if (session?.user) {
+      setUser(mapSessionToUser(session.user));
+      void enrichRole(session.user.id);
+      return true;
+    }
+    setUser(null);
+    return false;
+  }, [enrichRole]);
 
   useEffect(() => {
     let mounted = true;
 
-    const init = async () => {
-      setLoading(true);
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session && mounted) {
-          await loadUserWithRole(data.session);
-        } else if (mounted) {
-          setUser(null);
-          setError(null);
-        }
-      } catch (e) {
-        console.error('Error initializing auth:', e);
-        if (mounted) {
-          setUser(null);
-          setError('Authentication error');
-        }
-      } finally {
-        if (mounted) setLoading(false);
+    const applySession = (session) => {
+      console.log('SESSION:', session);
+      const u = session?.user ? mapSessionToUser(session.user) : null;
+      setUser(u);
+      if (u?.id) {
+        setOauthCallbackHadError(false);
+        setError(null);
+        void enrichRole(session.user.id);
       }
+      // Do not setError(null) when u is null — that was wiping ?error= messages from the OAuth redirect.
     };
 
-    init();
+    (async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const parsed = parseOAuthErrorFromWindow();
+          if (parsed) {
+            const { error: oauthErr, message: msg } = parsed;
+            console.error('[auth] OAuth redirect error:', oauthErr, msg);
+            const isExchangeFail =
+              /exchange|external code|server_error|unexpected_failure/i.test(
+                `${msg} ${oauthErr} ${parsed.error_code || ''}`
+              );
+            const fullMsg =
+              (msg || 'Sign-in failed.') +
+              (isExchangeFail ? googleOAuthExchangeFailureHint() : '');
+            if (mounted) {
+              setError(fullMsg);
+              setOauthCallbackHadError(true);
+            }
+            clearOAuthCallbackFromBrowserUrl();
+          }
+        }
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+        /**
+         * Do NOT call exchangeCodeForSession() here. getSession() awaits the client's initializePromise,
+         * which already runs PKCE exchange from ?code= and saves the session. A second exchange removes
+         * the verifier and fails with AuthPKCECodeVerifierMissingError — leaving you stuck with no session.
+         */
+        let session = null;
+        for (let i = 0; i < 15; i++) {
+          const { data, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError) console.error('getSession:', sessionError);
+          session = data.session ?? null;
+          if (session?.user) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        console.log('SESSION:', session);
         if (!mounted) return;
         if (session) {
-          await loadUserWithRole(session);
-        } else {
-          setUser(null);
-          setError(null);
+          applySession(session);
         }
+      } finally {
+        if (mounted) setAuthLoading(false);
       }
-    );
+    })();
+
+    const { data: listenerData } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('AUTH EVENT:', event, session);
+      console.log('SESSION:', session);
+      if (!mounted) return;
+      if (event === 'TOKEN_REFRESHED') return;
+      if (event === 'INITIAL_SESSION') {
+        if (session?.user) applySession(session);
+        return;
+      }
+      applySession(session ?? null);
+    });
 
     return () => {
       mounted = false;
-      listener?.subscription?.unsubscribe();
+      listenerData?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [enrichRole]);
 
-  const signInWithGoogle = async () => {
+  const clearAuthSurfaceErrors = useCallback(() => {
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (signInError) {
-      console.error('Supabase OAuth sign-in error:', signInError);
-      setError('Failed to sign in with Google');
-    }
-  };
+    setOauthCallbackHadError(false);
+  }, []);
 
   const signOut = async () => {
     try {
-      setLoading(true);
+      setAuthLoading(true);
       await supabase.auth.signOut();
       setUser(null);
       setError(null);
-      window.location.href = '/login';
+      setOauthCallbackHadError(false);
+      window.location.assign('/login');
     } catch (err) {
       console.error('Error signing out:', err);
       setUser(null);
-      window.location.href = '/login';
+      setError(null);
+      setOauthCallbackHadError(false);
+      window.location.assign('/login');
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
   };
 
@@ -135,23 +198,24 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     role,
-    loading,
+    loading: authLoading,
+    authLoading,
     error,
-    signInWithGoogle,
+    oauthCallbackHadError,
+    clearAuthSurfaceErrors,
+    syncUserFromSupabase,
     signOut,
-    isAuthenticated: !!user && !!user?.role,
+    isAuthenticated: !!user,
     hasRole: (requiredRole) =>
-      !!role && !!requiredRole && (String(role).trim() === String(requiredRole).trim() || String(user?.roleCode ?? '').trim() === String(requiredRole).trim()),
+      !!role &&
+      !!requiredRole &&
+      (String(role).trim() === String(requiredRole).trim() ||
+        String(user?.roleCode ?? '').trim() === String(requiredRole).trim()),
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom hook to use auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -160,4 +224,4 @@ export const useAuth = () => {
   return context;
 };
 
-export default AuthContext; 
+export default AuthContext;

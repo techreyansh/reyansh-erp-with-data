@@ -1,5 +1,7 @@
 import * as db from '../lib/db';
 import config from '../config/config';
+import { parseJsonArray } from '../utils/parseJsonField';
+import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
 
 // Generate unique client code (PC + 4 digits starting from PC0001 for Prospects Clients)
 async function generateClientCode() {
@@ -45,7 +47,7 @@ export async function getAllClients(forceRefresh = false) {
     website: row.Website || '',
     
     // Contact Management
-    contacts: row.Contacts ? JSON.parse(row.Contacts) : [],
+    contacts: parseJsonArray(row.Contacts),
     
     // Business Terms
     paymentTerms: row.PaymentTerms || '',
@@ -54,7 +56,7 @@ export async function getAllClients(forceRefresh = false) {
     deliveryTerms: row.DeliveryTerms || '',
     
     // Product Information
-    products: row.Products ? JSON.parse(row.Products) : [],
+    products: parseJsonArray(row.Products),
     
     // Additional Information
     notes: row.Notes || '',
@@ -97,8 +99,8 @@ export async function addClient(client) {
     
     // Business Terms
     PaymentTerms: client.paymentTerms || '',
-    CreditLimit: client.creditLimit || '',
-    CreditPeriod: client.creditPeriod || '',
+    CreditLimit: sheetFloat(client.creditLimit, 0),
+    CreditPeriod: sheetInt(client.creditPeriod, 0),
     DeliveryTerms: client.deliveryTerms || '',
     
     // Product Information
@@ -107,10 +109,10 @@ export async function addClient(client) {
     // Additional Information
     Notes: client.notes || '',
     Status: client.status || 'Active',
-    Rating: client.rating || 0,
+    Rating: sheetInt(client.rating, 0),
     LastContactDate: client.lastContactDate || '',
-    TotalOrders: client.totalOrders || 0,
-    TotalValue: client.totalValue || 0
+    TotalOrders: sheetInt(client.totalOrders, 0),
+    TotalValue: sheetFloat(client.totalValue, 0)
   };
   await db.insertTableRow(db.getTableName(config.sheets.prospectsClients), row);
 }
@@ -153,8 +155,8 @@ export async function updateClient(client, originalClientCode = null) {
     
     // Business Terms
     PaymentTerms: client.paymentTerms || '',
-    CreditLimit: client.creditLimit || '',
-    CreditPeriod: client.creditPeriod || '',
+    CreditLimit: sheetFloat(client.creditLimit, 0),
+    CreditPeriod: sheetInt(client.creditPeriod, 0),
     DeliveryTerms: client.deliveryTerms || '',
     
     // Product Information
@@ -163,10 +165,10 @@ export async function updateClient(client, originalClientCode = null) {
     // Additional Information
     Notes: client.notes || '',
     Status: client.status || 'Active',
-    Rating: client.rating || 0,
+    Rating: sheetInt(client.rating, 0),
     LastContactDate: client.lastContactDate || '',
-    TotalOrders: client.totalOrders || 0,
-    TotalValue: client.totalValue || 0
+    TotalOrders: sheetInt(client.totalOrders, 0),
+    TotalValue: sheetFloat(client.totalValue, 0)
   };
   // Row index in sheet = idx + 2 (header + 1-based)
   await db.updateRowByIndex(db.getTableName(config.sheets.prospectsClients), idx + 2, row);

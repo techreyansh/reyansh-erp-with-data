@@ -41,14 +41,9 @@ const ApproveIndent = () => {
     setError(null);
     try {
       const allIndents = await purchaseFlowService.getAllIndents();
-      // Filter for indents where the current step's NextStep is 2 (Approve Indent)
-      const filtered = allIndents.filter(indent => {
-        const steps = indent.Steps || [];
-        if (steps.length === 0) return false;
-        const currentStep = steps[steps.length - 1];
-        const nextStep = Number(currentStep.NextStep || currentStep.nextStep);
-        return nextStep === 2;
-      });
+      const filtered = allIndents.filter((indent) =>
+        purchaseFlowService.isAwaitingApproveIndent(indent)
+      );
       setIndents(filtered);
     } catch (err) {
       setError('Failed to fetch indents');

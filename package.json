@@ -9,6 +9,7 @@
     "@mui/icons-material": "^7.1.0",
     "@mui/material": "^7.1.0",
     "@mui/x-date-pickers": "^8.5.2",
+    "@react-oauth/google": "^0.12.2",
     "@supabase/supabase-js": "^2.97.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -31,6 +32,12 @@
     "recharts": "^3.1.2",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "~4.9.5"
   },
   "scripts": {
     "start": "react-scripts start",

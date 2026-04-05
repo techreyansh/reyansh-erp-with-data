@@ -15,7 +15,9 @@ import {
   Alert,
 } from "@mui/material";
 import { setGlobalErrorNotifier } from "./lib/supabaseErrorHandler";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./context/AuthContext";
+import { getGoogleWebClientId } from "./lib/googleWebClientId";
 import { UserProvider } from "./context/UserContext";
 import { StepStatusProvider } from './context/StepStatusContext';
 
@@ -31,7 +33,8 @@ import ProspectsClientManager from "./components/common/ProspectsClientManager";
 import FlowManagement from "./components/flowManagement/FlowManagement";
 import MyTasks from "./components/flowManagement/MyTasks";
 import ComingSoon from "./components/common/ComingSoon";
-import PrivateRoute from "./components/auth/PrivateRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import RootRedirect from "./components/auth/RootRedirect";
 import CEOOnlyRoute from "./components/auth/CEOOnlyRoute";
 import CEOExecutiveDashboard from "./components/ceoDashboard/CEOExecutiveDashboard";
 import StorageDebugger from "./components/dev/StorageDebugger";
@@ -507,16 +510,17 @@ const theme = createTheme({
   },
 });
 
-// Private Route component
-const PrivateRouteComponent = ({ children }) => {
-  return <PrivateRoute>{children}</PrivateRoute>;
-};
+const ProtectedRouteGate = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>;
 
 function AppContent() {
-  const { loading: authLoading } = useAuth();
+  const { authLoading } = useAuth();
   const { loading: userLoading } = useUser();
   const location = useLocation();
-  if (authLoading || userLoading) return <FullScreenLogoLoader />;
+  const isPublicEntry =
+    location.pathname === "/login" || location.pathname === "/";
+  if (!isPublicEntry && (authLoading || userLoading)) {
+    return <FullScreenLogoLoader />;
+  }
   return (
     <Box
       sx={{
@@ -526,7 +530,7 @@ function AppContent() {
         backgroundColor: "background.default",
       }}
     >
-      <Header />
+      {!isPublicEntry && <Header />}
       <Box component="main" sx={{ flex: 1, py: 3, px: { xs: 2, sm: 3 }, maxWidth: "100%" }}>
         <Box
           key={location.pathname}
@@ -535,11 +539,12 @@ function AppContent() {
         >
           <Routes>
                   <Route path="/login" element={<Login />} />
+                  <Route path="/" element={<RootRedirect />} />
 
                   <Route path="/dashboard" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Dashboard />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   <Route path="/ceo-command" element={
                     <CEOOnlyRoute>
@@ -547,65 +552,65 @@ function AppContent() {
                     </CEOOnlyRoute>
                   } />
                   <Route path="/profile" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ProfilePage />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   <Route path="/settings" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <SettingsPage />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   <Route path="/help" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <HelpPage />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/clients" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ClientManager />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/prospects-clients" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ProspectsClientManager />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/client-dashboard" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ClientDashboard />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/products" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ProductManagement />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/client-orders" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <EnhancedClientOrderTakingSheet />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/po-ingestion" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <SalesOrderIngestion />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/flow-management" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <FlowManagement />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/my-tasks" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ComingSoon 
                         title="My Tasks"
                         subtitle="Task Management Feature Coming Soon"
@@ -613,74 +618,74 @@ function AppContent() {
                         showBackButton={true}
                         showNotifyButton={false}
                       />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/cable-production" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Navigate to="/cable-production/dashboard" replace />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   <Route path="/cable-production/dashboard" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <CableProductionModule />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   <Route path="/cable-production/production-planning" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <CableProductionModule />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   <Route path="/cable-production/machine-scheduling" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <CableProductionModule />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   {/* Old Molding Route (kept for backward compatibility) */}
                   <Route path="/molding-production" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <MoldingProductionModule />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   {/* New Molding Routes Structure */}
                   <Route path="/molding" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <MoldingMainNavigation />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/molding/dashboard" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <MoldingDashboardNavigation />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/molding/power-cord-master" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <PowerCordMasterNavigation />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/molding/production-planning" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ProductionPlanningNavigation />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/molding/production-management" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <ProductionManagementNavigation />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route path="/purchase-flow" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <StepStatusProvider>
                         <PurchaseFlowLayout />
                       </StepStatusProvider>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   }>
                     <Route index element={<PurchaseFlow />} />
                     <Route path="raise-indent" element={<RaiseIndent />} />
@@ -709,115 +714,115 @@ function AppContent() {
                   <Route
                     path="/vendor-management"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <VendorManagement />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/inventory"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <InventoryMainNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   {/* Separate Inventory Module Routes */}
                   <Route
                     path="/inventory/stock-sheet"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <StockSheetNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/stock-sheet/material-inward"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <MaterialInwardNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/stock-sheet/material-outward"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <MaterialIssueNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/stock-sheet/fg-material-inward"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <FGMaterialInwardNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/stock-sheet/fg-material-outward"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <FGMaterialOutwardNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/finished-goods"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <FinishedGoodsNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/bill-of-materials"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <BillOfMaterialsNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/bill-of-materials/kitting-sheet"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <KittingSheetNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/kitting-sheet"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <KittingSheetNavigation />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   <Route
                     path="/inventory/fg-to-billing"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <FGToBilling />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   {/* Legacy Inventory Route (for backward compatibility) */}
                   <Route
                     path="/inventory/legacy"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <Inventory />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     } />
 
                   {/* Sales Flow Routes */}
                   <Route path="/sales-flow" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <SalesFlowLayout />
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   }>
                     <Route index element={<SalesFlow />} />
                     <Route path="log-and-qualify-leads" element={<LogAndQualifyLeads />} />
@@ -842,93 +847,93 @@ function AppContent() {
                   </Route>
                   
                   <Route path="/sales-flow/plan-manufacturing" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Plan & Execute Manufacturing</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This step is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/sales-flow/pack-dispatch" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Pack & Dispatch Material</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This step is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/sales-flow/generate-invoice" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Generate Invoice</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This step is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/sales-flow/update-client" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Update Client on Dispatch</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This step is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/sales-flow/follow-up-feedback" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Follow up for Feedback & Repeat Order</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This step is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/sales-flow/follow-up-payment" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Follow-up on Balance Payment</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This step is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
                   
                   <Route path="/sales-flow/view-details" element={
-                    <PrivateRouteComponent>
+                    <ProtectedRouteGate>
                       <Box sx={{ p: 3, textAlign: 'center' }}>
                         <Typography variant="h4">Sales Flow Details</Typography>
                         <Typography variant="body1" sx={{ mt: 2 }}>This view is under development.</Typography>
                       </Box>
-                    </PrivateRouteComponent>
+                    </ProtectedRouteGate>
                   } />
 
                   <Route
                     path="/setup-sheets"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <Box sx={{ maxWidth: 1200, mx: "auto", px: 2 }}>
                           <Typography variant="h4" sx={{ mb: 3 }}>
                             Database Setup
                           </Typography>
                           <SheetInitializer />
                         </Box>
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/troubleshoot-sheets"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <Box sx={{ maxWidth: 1200, mx: "auto", px: 2 }}>
                           <Typography variant="h4" sx={{ mb: 3 }}>
                             Troubleshoot connection
                           </Typography>
                           <SheetsTroubleshooting />
                         </Box>
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
@@ -936,14 +941,14 @@ function AppContent() {
                     <Route
                       path="/storage-debug"
                       element={
-                        <PrivateRouteComponent>
+                        <ProtectedRouteGate>
                           <Box sx={{ maxWidth: 1200, mx: "auto", px: 2 }}>
                             <Typography variant="h4" sx={{ mb: 3 }}>
                               Document Storage Debugger
                             </Typography>
                             <StorageDebugger />
                           </Box>
-                        </PrivateRouteComponent>
+                        </ProtectedRouteGate>
                       }
                     />
                   )}
@@ -951,77 +956,76 @@ function AppContent() {
                   <Route
                     path="/dispatch"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <DispatchForm />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/dispatch-management"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <DispatchManagement />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/dispatch-test"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <DispatchTest />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/costing"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <Costing />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/client-dashboard"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <ClientDashboard />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/employee-dashboard"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <AdvancedEmployeeDashboard />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/document-library"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <DocumentLibrary />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
                   <Route
                     path="/crm"
                     element={
-                      <PrivateRouteComponent>
+                      <ProtectedRouteGate>
                         <CRMManagement />
-                      </PrivateRouteComponent>
+                      </ProtectedRouteGate>
                     }
                   />
 
-                  <Route path="/" element={<Navigate to="/login" replace />} />
-                  <Route path="*" element={<Navigate to="/login" replace />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
         </Box>
               </Box>
@@ -1075,20 +1079,33 @@ function GlobalErrorToaster({ children }) {
   );
 }
 
+function AppShell() {
+  return (
+    <AuthProvider>
+      <UserProvider>
+        <StepStatusProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </StepStatusProvider>
+      </UserProvider>
+    </AuthProvider>
+  );
+}
+
 function App() {
+  const googleClientId = getGoogleWebClientId();
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <GlobalErrorToaster>
-        <AuthProvider>
-          <UserProvider>
-            <StepStatusProvider>
-              <BrowserRouter>
-                <AppContent />
-              </BrowserRouter>
-            </StepStatusProvider>
-          </UserProvider>
-        </AuthProvider>
+        {googleClientId ? (
+          <GoogleOAuthProvider clientId={googleClientId}>
+            <AppShell />
+          </GoogleOAuthProvider>
+        ) : (
+          <AppShell />
+        )}
       </GlobalErrorToaster>
     </ThemeProvider>
   );

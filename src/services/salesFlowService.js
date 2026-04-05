@@ -1,6 +1,202 @@
 import * as db from '../lib/db';
 import config from '../config/config';
 import { getAllProductsFromClients } from './clientService';
+import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
+import { parseJsonArray } from '../utils/parseJsonField';
+
+/** Postgres timestamptz / date columns reject ""; use null for optional dates (legacy flat tables). */
+function nullIfBlankTimestamp(v) {
+  if (v === '' || v == null) return null;
+  return v;
+}
+
+/** Flat sheet tables often omit ClientCode; keep link in Notes when needed. */
+function notesWithOptionalClientCode(notes, clientCode) {
+  const c = clientCode != null && String(clientCode).trim() ? String(clientCode).trim() : '';
+  if (!c) return notes || '';
+  const line = `[Linked client: ${c}]`;
+  const n = notes != null && String(notes).trim() ? String(notes).trim() : '';
+  return n ? `${n}\n${line}` : line;
+}
+
+function productsInterestedJsonString(val) {
+  if (val == null) return '[]';
+  if (Array.isArray(val)) return JSON.stringify(val);
+  if (typeof val === 'string') {
+    const t = val.trim();
+    if (!t) return '[]';
+    try {
+      const p = JSON.parse(t);
+      return Array.isArray(p) ? t : JSON.stringify([p]);
+    } catch {
+      return JSON.stringify([val]);
+    }
+  }
+  return JSON.stringify([val]);
+}
+
+/** Flat Supabase inserts: arrays/objects must become JSON text (e.g. ProductsInterested). */
+function normalizeSheetRowForInsert(row) {
+  if (!row || typeof row !== 'object') return row;
+  const out = { ...row };
+  for (const key of Object.keys(out)) {
+    const v = out[key];
+    if (v instanceof Date) {
+      out[key] = v.toISOString();
+    } else if (v != null && typeof v === 'object') {
+      try {
+        out[key] = JSON.stringify(v);
+      } catch {
+        out[key] = '';
+      }
+    }
+  }
+  return out;
+}
+
+function sanitizeSalesFlowMainInsert(row) {
+  const r = { ...row };
+  const cs = r.CurrentStep;
+  if (cs === '-' || String(cs).trim() === '-1') r.CurrentStep = '-';
+  else r.CurrentStep = sheetInt(cs, 1);
+  r.TAT = sheetFloat(r.TAT, 1);
+  r.StepId = sheetInt(r.StepId, 1);
+  const ns = r.NextStep;
+  if (ns === '-' || String(ns).trim() === '-1') r.NextStep = '-';
+  else r.NextStep = sheetInt(ns, 2);
+  if (r.PreviousStep === '' || r.PreviousStep == null) r.PreviousStep = null;
+  else r.PreviousStep = sheetInt(r.PreviousStep, 0);
+  r.ExpectedDelivery = nullIfBlankTimestamp(r.ExpectedDelivery);
+  r.CreatedBy = r.CreatedBy || 'system';
+  r.LastModifiedBy = r.LastModifiedBy || r.CreatedBy;
+  return r;
+}
+
+function sanitizeSalesFlowStepTimestampsForDb(row) {
+  if (!row || typeof row !== 'object') return row;
+  const r = { ...row };
+  if ('StartTime' in r) r.StartTime = nullIfBlankTimestamp(r.StartTime);
+  if ('EndTime' in r) r.EndTime = nullIfBlankTimestamp(r.EndTime);
+  return r;
+}
+
+function sanitizeSalesFlowStepInsert(row) {
+  const r = { ...row };
+  r.StartTime = nullIfBlankTimestamp(r.StartTime);
+  r.EndTime = nullIfBlankTimestamp(r.EndTime);
+  if (r.PreviousStep === '' || r.PreviousStep == null) r.PreviousStep = '0';
+  else r.PreviousStep = String(sheetInt(r.PreviousStep, 0));
+  r.TAT = r.TAT === '' || r.TAT == null ? '1' : String(sheetFloat(r.TAT, 1));
+  r.LastModifiedBy = r.LastModifiedBy || 'system';
+  const sid = sheetInt(r.StepId, 1);
+  r.StepId = String(sid);
+  r.StepNumber = String(sheetInt(r.StepNumber, sid));
+  const next = coerceSalesFlowNextStep(r.NextStep, 2);
+  r.NextStep = next === '-' ? '-' : String(next);
+  return r;
+}
+
+/** Flatten legacy snake_case / mixed keys from jsonb or flat tables. */
+function normalizeSalesFlowRow(flow) {
+  if (flow == null || typeof flow !== 'object' || Array.isArray(flow)) return null;
+  const out = { ...flow };
+  const logId = flow.LogId ?? flow.logId ?? flow.log_id;
+  if (logId !== undefined && logId !== null && logId !== '') out.LogId = logId;
+  const next = flow.NextStep ?? flow.nextStep ?? flow.next_step;
+  if (next !== undefined) out.NextStep = next;
+  const cur = flow.CurrentStep ?? flow.currentStep ?? flow.current_step;
+  if (cur !== undefined) out.CurrentStep = cur;
+  return out;
+}
+
+function parseStepNumber(raw) {
+  if (raw == null || raw === '' || raw === '-') return null;
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    const inner = raw.nextStep ?? raw.NextStep ?? raw.step;
+    if (inner !== undefined) return parseStepNumber(inner);
+    return null;
+  }
+  const n = parseInt(String(raw).trim(), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Next step on step rows: integer or '-' / -1; never String(object). */
+function coerceSalesFlowNextStep(value, fallback) {
+  if (value == null || value === '') return fallback;
+  if (value === '-' || value === -1 || value === '-1') return '-';
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const inner = value.nextStep ?? value.NextStep ?? value.step;
+    if (inner !== undefined) return coerceSalesFlowNextStep(inner, fallback);
+    return fallback;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  const s = String(value).trim();
+  if (s === '-' || s === '-1') return '-';
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function flowNumericNextStep(flow) {
+  const raw = flow?.NextStep ?? flow?.nextStep ?? flow?.next_step;
+  return parseStepNumber(raw);
+}
+
+function stepRowNumericNext(step) {
+  const raw = step?.NextStep ?? step?.nextStep ?? step?.next_step;
+  return parseStepNumber(raw);
+}
+
+function logIdEquals(a, b) {
+  return String(a ?? '') === String(b ?? '');
+}
+
+function stepIdEquals(stepIdField, expected) {
+  return String(stepIdField ?? '').trim() === String(expected ?? '').trim();
+}
+
+function isStepStatusCompleted(status) {
+  const s = String(status ?? '').toLowerCase().trim();
+  return s === 'completed' || s === 'done';
+}
+
+/**
+ * Flows that should appear in the "next step" queue (numeric match + step-2 fallback from step 1 row).
+ */
+function collectFlowsForNextStep(salesFlows, salesFlowSteps, targetStep) {
+  const target = Number(targetStep);
+  if (!Number.isFinite(target)) return [];
+  const seen = new Set();
+  const out = [];
+
+  const pushFlow = (flow) => {
+    const id = flow?.LogId ?? flow?.logId ?? flow?.log_id;
+    if (id == null || id === '') return;
+    const key = String(id);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(flow);
+  };
+
+  for (const flow of salesFlows) {
+    if (flow == null || typeof flow !== 'object') continue;
+    if (flowNumericNextStep(flow) === target) pushFlow(flow);
+  }
+
+  if (target === 2 && Array.isArray(salesFlowSteps)) {
+    for (const step of salesFlowSteps) {
+      const sid = String(step.StepId ?? step.stepId ?? step.step_id ?? '').trim();
+      if (sid !== '1') continue;
+      if (stepRowNumericNext(step) !== 2) continue;
+      const status = String(step.Status ?? step.status ?? '').toLowerCase();
+      if (status === 'completed') continue;
+      const logId = step.LogId ?? step.logId ?? step.log_id;
+      const flow = salesFlows.find((f) => String(f.LogId ?? f.logId ?? f.log_id ?? '') === String(logId ?? ''));
+      if (flow) pushFlow(flow);
+    }
+  }
+
+  return out;
+}
 
 const SHEET_NAME = config.sheets.salesFlow;
 const STEPS_SHEET = config.sheets.salesFlowSteps;
@@ -12,6 +208,54 @@ const CONFIRM_STANDARD_AND_COMPLIANCE_SHEET = config.sheets.confirmStandardAndCo
 function table(sheetName) {
   return db.getTableName(sheetName) || sheetName;
 }
+
+async function insertTableRowWithLabel(label, logicalName, row) {
+  try {
+    await db.insertTableRow(table(logicalName), row);
+  } catch (err) {
+    const msg = err?.message || err?.details || String(err);
+    throw new Error(`${label}: ${msg}`);
+  }
+}
+
+const COMPLIANCE_PHYSICAL_TABLES = [
+  'confirm_standard_and_compliance',
+  'confirm_standard_and_compliance_data'
+];
+
+function isPostgrestMissingTableError(err) {
+  const m = String(err?.message || err?.details || err?.hint || '').toLowerCase();
+  return (
+    m.includes('schema cache') ||
+    m.includes('pgrst205') ||
+    m.includes('could not find the table') ||
+    (m.includes('relation') && m.includes('does not exist'))
+  );
+}
+
+/**
+ * Try multiple physical table names (migration vs legacy *_data). Table must exist in the Supabase project used by .env.
+ */
+async function insertComplianceSheetRow(label, row) {
+  let lastErr;
+  for (const physicalName of COMPLIANCE_PHYSICAL_TABLES) {
+    try {
+      await db.insertTableRow(physicalName, row);
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (isPostgrestMissingTableError(err)) continue;
+      const msg = err?.message || err?.details || String(err);
+      throw new Error(`${label}: ${msg}`);
+    }
+  }
+  const base =
+    lastErr?.message || lastErr?.details || String(lastErr || 'table not available');
+  const hint =
+    `Neither public.confirm_standard_and_compliance nor public.confirm_standard_and_compliance_data exists for the Supabase project in your .env URL. In that project's SQL Editor, run supabase/migrations/20260405150000_ensure_confirm_standard_and_compliance_table.sql (it ends with NOTIFY to refresh the API). If saving still fails, use Dashboard → Settings → API → Reload schema.`;
+  throw new Error(`${label}: ${base} — ${hint}`);
+}
+
 async function updateRowByIndex(sheetName, rowIndex, data) {
   const rows = await db.getTableRows(table(sheetName));
   const row = rows[rowIndex - 2];
@@ -166,7 +410,9 @@ const salesFlowService = {
   async createLead(leadData, userEmail) {
     const logId = leadData.enquiryNumber || this.generateLogId();
     const now = new Date().toISOString();
-    
+    const actor = userEmail && String(userEmail).trim() ? String(userEmail).trim() : 'system';
+    const productsJson = productsInterestedJsonString(leadData.productsInterested);
+
     // Prepare lead data for LogAndQualifyLeads sheet with new fields
     const leadRecord = {
       EnquiryNumber: logId,
@@ -174,36 +420,34 @@ const salesFlowService = {
       CompanyName: leadData.companyName,
       MobileNumber: leadData.mobileNumber || leadData.phoneNumber,
       EmailId: leadData.emailId || leadData.email,
-      ProductsInterested: leadData.productsInterested ? JSON.stringify(leadData.productsInterested) : '[]',
+      ProductsInterested: productsJson,
       Requirement: leadData.requirement,
       LeadAssignedTo: leadData.leadAssignedTo,
       CustomerLocation: leadData.customerLocation,
       CustomerType: leadData.customerType,
-      Notes: leadData.notes,
-      ClientCode: leadData.clientCode || '', // Link to client/prospect
+      Notes: notesWithOptionalClientCode(leadData.notes, leadData.clientCode),
       DateOfEntry: now,
-      CreatedBy: userEmail,
+      CreatedBy: actor,
       CreatedAt: now,
       UpdatedAt: now,
       Status: 'New'
     };
 
     // Prepare sales flow data
-    const salesFlowRecord = {
+    const salesFlowRecord = sanitizeSalesFlowMainInsert({
       LogId: logId,
       FullName: leadData.customerName || leadData.fullName,
       CompanyName: leadData.companyName,
       Email: leadData.emailId || leadData.email,
       PhoneNumber: leadData.mobileNumber || leadData.phoneNumber,
-      ProductsInterested: leadData.productsInterested ? JSON.stringify(leadData.productsInterested) : '[]',
+      ProductsInterested: productsJson,
       LeadSource: leadData.leadSource || '',
       Priority: leadData.priority || 'Medium',
       QualificationStatus: leadData.qualificationStatus || 'New',
-      Notes: leadData.notes,
-      ClientCode: leadData.clientCode || '', // Link to client/prospect
+      Notes: notesWithOptionalClientCode(leadData.notes, leadData.clientCode),
       CurrentStep: 1,
       Status: 'New',
-      CreatedBy: userEmail,
+      CreatedBy: actor,
       CreatedAt: now,
       UpdatedAt: now,
       ExpectedDelivery: '',
@@ -212,14 +456,14 @@ const salesFlowService = {
       TATStatus: 'On Time',
       Documents: '[]',
       Comments: '[]',
-      LastModifiedBy: userEmail,
+      LastModifiedBy: actor,
       NextStep: 2,
       PreviousStep: '',
       StepId: 1
-    };
+    });
 
     // Prepare step data for SalesFlowSteps - Step 1 only
-    const stepRecord = {
+    const stepRecord = sanitizeSalesFlowStepInsert({
       StepId: '1',
       LogId: logId,
       StepNumber: '1',
@@ -238,17 +482,23 @@ const salesFlowService = {
       NextStep: '2',
       PreviousStep: '',
       Dependencies: '[]',
-      LastModifiedBy: userEmail,
+      LastModifiedBy: actor,
       LastModifiedAt: now,
       Note: 'Lead created and qualified'
+    });
+
+    const insertWithLabel = async (label, logicalTable, row) => {
+      try {
+        await db.insertTableRow(table(logicalTable), row);
+      } catch (err) {
+        const msg = err?.message || err?.details || String(err);
+        throw new Error(`${label}: ${msg}`);
+      }
     };
 
-    // Add records to all sheets
-    await Promise.all([
-      db.insertTableRow(table(LEADS_SHEET), leadRecord),
-      db.insertTableRow(table(SHEET_NAME), salesFlowRecord),
-      db.insertTableRow(table(STEPS_SHEET), stepRecord)
-    ]);
+    await insertWithLabel('Lead sheet', LEADS_SHEET, leadRecord);
+    await insertWithLabel('Sales flow', SHEET_NAME, salesFlowRecord);
+    await insertWithLabel('Sales flow steps', STEPS_SHEET, stepRecord);
 
     return {
       success: true,
@@ -261,15 +511,16 @@ const salesFlowService = {
   async getAllSalesFlows() {
     try {
       const data = await db.getTableRows(table(SHEET_NAME));
-      
-      // Filter out completed sales flows (where NextStep is "-")
-      const activeFlows = data.filter(flow => flow.NextStep !== '-');
-      
-      return activeFlows.map(flow => ({
+
+      const activeFlows = data
+        .map(normalizeSalesFlowRow)
+        .filter((flow) => flow != null && flow.NextStep !== '-');
+
+      return activeFlows.map((flow) => ({
         ...flow,
-        ProductsInterested: flow.ProductsInterested ? JSON.parse(flow.ProductsInterested) : [],
-        Documents: flow.Documents ? JSON.parse(flow.Documents) : [],
-        Comments: flow.Comments ? JSON.parse(flow.Comments) : []
+        ProductsInterested: parseJsonArray(flow.ProductsInterested),
+        Documents: parseJsonArray(flow.Documents),
+        Comments: parseJsonArray(flow.Comments)
       }));
     } catch (error) {
       console.error('Error getting sales flows:', error);
@@ -281,15 +532,16 @@ const salesFlowService = {
   async getAllSalesFlowSteps() {
     try {
       const data = await db.getTableRows(table(STEPS_SHEET));
-      
-      // Filter out completed sales flows (where NextStep is "-")
-      const activeSteps = data.filter(step => step.NextStep !== '-');
-      
-      return activeSteps.map(step => ({
+
+      const activeSteps = (data || []).filter(
+        (step) => step != null && typeof step === 'object' && step.NextStep !== '-'
+      );
+
+      return activeSteps.map((step) => ({
         ...step,
-        Documents: step.Documents ? JSON.parse(step.Documents) : [],
-        Comments: step.Comments ? JSON.parse(step.Comments) : [],
-        Dependencies: step.Dependencies ? JSON.parse(step.Dependencies) : []
+        Documents: parseJsonArray(step.Documents),
+        Comments: parseJsonArray(step.Comments),
+        Dependencies: parseJsonArray(step.Dependencies)
       }));
     } catch (error) {
       console.error('Error getting sales flow steps:', error);
@@ -436,51 +688,61 @@ const salesFlowService = {
   async updateSalesFlowStep(logId, stepId, status, data, userEmail) {
     try {
       const now = new Date().toISOString();
+      const stepIdNum = sheetInt(stepId, 1);
       // Update SalesFlowSteps
       const steps = await db.getTableRows(table(STEPS_SHEET));
 
       const stepUpdates = [];
-      
+
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
-        
-        if (step.LogId === logId && step.StepId === stepId.toString()) {
+
+        if (logIdEquals(step.LogId, logId) && stepIdEquals(step.StepId, stepId)) {
           const rowIndex = i + 2;
-          const updatedStep = {
+          let commentsVal = step.Comments;
+          if (data.comments != null) commentsVal = JSON.stringify(data.comments);
+          else if (data.Comments != null && typeof data.Comments === 'object')
+            commentsVal = JSON.stringify(data.Comments);
+          else if (typeof data.Comments === 'string') commentsVal = data.Comments;
+
+          const updatedStepDraft = sanitizeSalesFlowStepTimestampsForDb({
             ...step,
             Status: status,
             ApprovalStatus: data.ApprovalStatus || step.ApprovalStatus,
             RejectionReason: data.RejectionReason || step.RejectionReason,
             Documents: data.documents ? JSON.stringify(data.documents) : step.Documents,
-            Comments: data.comments ? JSON.stringify(data.comments) : step.Comments,
+            Comments: commentsVal,
             LastModifiedBy: userEmail,
             LastModifiedAt: now,
             EndTime: status === 'completed' ? now : step.EndTime
-          };
-          
+          });
+
           if (status === 'completed') {
-            // Use custom NextStep if provided, otherwise use the default flow
-            const nextStepNum = data.NextStep !== undefined ? data.NextStep : this.getNextStep(stepId);
-            updatedStep.NextStep = nextStepNum;
+            const defaultNext = this.getNextStep(stepIdNum);
+            const nextStepNum =
+              data.NextStep !== undefined
+                ? coerceSalesFlowNextStep(data.NextStep, defaultNext)
+                : defaultNext;
+            updatedStepDraft.NextStep =
+              nextStepNum === '-' || nextStepNum == null ? '-' : String(nextStepNum);
             
             // Create/update the next step record if it exists and is not the final step
-            if (nextStepNum && nextStepNum !== '-' && nextStepNum !== null) {
+            if (nextStepNum != null && nextStepNum !== '' && nextStepNum !== '-' && nextStepNum !== null) {
               // Check if next step record already exists
-              const nextStepExists = steps.find(s => 
-                s.LogId === logId && String(s.StepId) === String(nextStepNum)
+              const nextStepExists = steps.find(
+                (s) => logIdEquals(s.LogId, logId) && stepIdEquals(s.StepId, nextStepNum)
               );
               
               if (!nextStepExists) {
-                // Create new step record for the next step
-                const nextStepRecord = {
+                const nextStepRecord = sanitizeSalesFlowStepInsert({
                   StepId: String(nextStepNum),
                   LogId: logId,
                   StepNumber: String(nextStepNum),
-                  Role: this.getStepRole(nextStepNum),
-                  Action: this.getStepAction(nextStepNum),
+                  Role: this.getStepRole(Number(nextStepNum)),
+                  Action: this.getStepAction(Number(nextStepNum)),
                   Status: 'new',
-                  AssignedTo: this.getNextAssignee(nextStepNum),
-                  StartTime: '',
+                  AssignedTo: this.getNextAssignee(Number(nextStepNum)),
+                  StartTime: now,
                   EndTime: '',
                   TAT: '1',
                   TATStatus: 'On Time',
@@ -488,38 +750,44 @@ const salesFlowService = {
                   Comments: '[]',
                   ApprovalStatus: 'Pending',
                   RejectionReason: '',
-                  NextStep: this.getNextStep(nextStepNum) ? String(this.getNextStep(nextStepNum)) : '-',
-                  PreviousStep: String(stepId),
+                  NextStep: this.getNextStep(Number(nextStepNum))
+                    ? String(this.getNextStep(Number(nextStepNum)))
+                    : '-',
+                  PreviousStep: String(stepIdNum),
                   Dependencies: '[]',
                   LastModifiedBy: userEmail,
                   LastModifiedAt: now,
-                  Note: `Step ${nextStepNum} ready for ${this.getStepRole(nextStepNum)}`
-                };
-                
-                // Append the new step record
+                  Note: `Step ${nextStepNum} ready for ${this.getStepRole(Number(nextStepNum))}`
+                });
+
                 await db.insertTableRow(table(STEPS_SHEET), nextStepRecord);
               } else {
                 // Update existing next step record to make it active
-                const nextStepIndex = steps.findIndex(s => 
-                  s.LogId === logId && String(s.StepId) === String(nextStepNum)
+                const nextStepIndex = steps.findIndex(
+                  (s) => logIdEquals(s.LogId, logId) && stepIdEquals(s.StepId, nextStepNum)
                 );
                 
                 if (nextStepIndex !== -1) {
                   const nextStepRowIndex = nextStepIndex + 2;
-                  const nextStepUpdate = {
-                    ...steps[nextStepIndex],
-                    Status: 'new',
-                    AssignedTo: this.getNextAssignee(nextStepNum),
-                    StartTime: steps[nextStepIndex].StartTime || '',
-                    LastModifiedBy: userEmail,
-                    LastModifiedAt: now
-                  };
+                  const existingStart = nullIfBlankTimestamp(steps[nextStepIndex].StartTime);
+                  const nextStepUpdate = sanitizeSalesFlowStepInsert(
+                    sanitizeSalesFlowStepTimestampsForDb({
+                      ...steps[nextStepIndex],
+                      Status: 'new',
+                      AssignedTo: this.getNextAssignee(Number(nextStepNum)),
+                      StartTime: existingStart ?? now,
+                      LastModifiedBy: userEmail,
+                      LastModifiedAt: now
+                    })
+                  );
                   stepUpdates.push(updateRowByIndex(STEPS_SHEET, nextStepRowIndex, nextStepUpdate));
                 }
               }
             }
           }
-          stepUpdates.push(updateRowByIndex(STEPS_SHEET, rowIndex, updatedStep));
+          stepUpdates.push(
+            updateRowByIndex(STEPS_SHEET, rowIndex, sanitizeSalesFlowStepInsert(updatedStepDraft))
+          );
         }
       }
 
@@ -532,19 +800,35 @@ const salesFlowService = {
         const flow = flows[i];
         if (flow.LogId === logId) {
           const rowIndex = i + 2;
-          let newStatus = status === 'completed' ? 
-                         (data.NextStep === '-' ? 'Completed' : 'In Progress') : 
-                         (status === 'rejected' ? 'Rejected' : flow.Status);
-          
-          const updatedFlow = {
+          const defaultNext = this.getNextStep(stepIdNum);
+          const resolvedNext =
+            status === 'completed'
+              ? data.NextStep !== undefined
+                ? coerceSalesFlowNextStep(data.NextStep, defaultNext)
+                : defaultNext
+              : null;
+          const newStatus =
+            status === 'completed'
+              ? resolvedNext === '-'
+                ? 'Completed'
+                : 'In Progress'
+              : status === 'rejected'
+                ? 'Rejected'
+                : flow.Status;
+
+          const updatedFlow = sanitizeSalesFlowMainInsert({
             ...flow,
             Status: newStatus,
-            CurrentStep: status === 'completed' ? (data.NextStep !== undefined ? data.NextStep : this.getNextStep(stepId)) : flow.CurrentStep,
-            NextStep: status === 'completed' ? (data.NextStep !== undefined ? data.NextStep : this.getNextStep(stepId)) : flow.NextStep,
+            CurrentStep:
+              status === 'completed' ? resolvedNext ?? flow.CurrentStep : flow.CurrentStep,
+            NextStep: status === 'completed' ? resolvedNext ?? flow.NextStep : flow.NextStep,
             UpdatedAt: now,
             LastModifiedBy: userEmail,
-            AssignedTo: status === 'completed' ? this.getNextAssignee(this.getNextStep(stepId)) : flow.AssignedTo
-          };
+            AssignedTo:
+              status === 'completed' && resolvedNext != null && resolvedNext !== '-'
+                ? this.getNextAssignee(Number(resolvedNext))
+                : flow.AssignedTo
+          });
           flowUpdates.push(updateRowByIndex(SHEET_NAME, rowIndex, updatedFlow));
         }
       }
@@ -610,7 +894,9 @@ const salesFlowService = {
   async getStepDetails(logId, stepId) {
     try {
       const steps = await db.getTableRows(table(STEPS_SHEET));
-      return steps.find(step => step.LogId === logId && step.StepId === stepId.toString());
+      return steps.find(
+        (step) => logIdEquals(step.LogId, logId) && stepIdEquals(step.StepId, stepId)
+      );
     } catch (error) {
       console.error('Error getting step details:', error);
       throw error;
@@ -621,15 +907,16 @@ const salesFlowService = {
   async getAllLeads() {
     try {
       const data = await db.getTableRows(table(LEADS_SHEET));
-      return data.map(lead => ({
-        ...lead,
-        // Map new field names to maintain compatibility
-        LogId: lead.EnquiryNumber || lead.LogId,
-        FullName: lead.CustomerName || lead.FullName,
-        Email: lead.EmailId || lead.Email,
-        PhoneNumber: lead.MobileNumber || lead.PhoneNumber,
-        ProductsInterested: lead.ProductsInterested ? JSON.parse(lead.ProductsInterested) : []
-      }));
+      return (data || [])
+        .filter((lead) => lead != null && typeof lead === 'object' && !Array.isArray(lead))
+        .map((lead) => ({
+          ...lead,
+          LogId: lead.EnquiryNumber || lead.LogId || lead.logId || lead.enquiry_number,
+          FullName: lead.CustomerName || lead.FullName,
+          Email: lead.EmailId || lead.Email,
+          PhoneNumber: lead.MobileNumber || lead.PhoneNumber,
+          ProductsInterested: parseJsonArray(lead.ProductsInterested)
+        }));
     } catch (error) {
       console.error('Error getting leads:', error);
       throw error;
@@ -828,38 +1115,36 @@ const salesFlowService = {
     try {
       const salesFlows = await this.getAllSalesFlows();
       const salesFlowSteps = await db.getTableRows(table(STEPS_SHEET)).catch(() => []);
-      
-      // For step 6, use the same pattern as steps 4 and 5
+
+      // Step 6: same relaxed matching as getStandardsAndComplianceDetails / getCheckFeasibilityDetails
       if (nextStep == 6) {
-        // Find flows where step 5 is completed and next step is 6
-        const step5CompletedAndNextIs6 = salesFlowSteps.filter(step =>
-          step.StepId === '5' &&
-          step.Status === 'completed' &&
-          step.NextStep === '6'
+        const step5CompletedNext6 = salesFlowSteps.filter(
+          (step) =>
+            step &&
+            typeof step === 'object' &&
+            stepIdEquals(step.StepId, 5) &&
+            isStepStatusCompleted(step.Status) &&
+            stepRowNumericNext(step) === 6
         );
 
-        const flowsForStep = salesFlows.filter(flow => {
-          const step5 = step5CompletedAndNextIs6.find(s => s.LogId === flow.LogId);
-          if (!step5) return false;
-          
-          // Check if step 6 is already completed for this LogId
-          const step6 = salesFlowSteps.find(s => 
-            s.LogId === flow.LogId && 
-            String(s.StepId) === '6'
+        const flowsForStep = salesFlows.filter((flow) => {
+          if (flow == null || typeof flow !== 'object') return false;
+          const step5Match = step5CompletedNext6.some((s) => logIdEquals(s.LogId, flow.LogId));
+          const mainNextIs6 = flowNumericNextStep(flow) === 6;
+          if (!step5Match && !mainNextIs6) return false;
+
+          const step6 = salesFlowSteps.find(
+            (s) => s && logIdEquals(s.LogId, flow.LogId) && stepIdEquals(s.StepId, 6)
           );
-          
-          // Only include if step 6 doesn't exist or is not completed
-          return !step6 || step6.Status !== 'completed';
+          return !step6 || !isStepStatusCompleted(step6.Status);
         });
-        
-        // Get detailed lead information from LogAndQualifyLeads sheet
+
         const allLeads = await this.getAllLeads();
-        
-        // Merge sales flow data with detailed lead information
-        const enrichedFlows = flowsForStep.map(flow => {
-          // Find corresponding lead details using LogId (which is now EnquiryNumber)
-          const leadDetails = allLeads.find(lead => 
-            lead.LogId === flow.LogId || lead.EnquiryNumber === flow.LogId
+
+        const enrichedFlows = flowsForStep.map((flow) => {
+          const leadDetails = allLeads.find(
+            (lead) =>
+              logIdEquals(lead.LogId, flow.LogId) || logIdEquals(lead.EnquiryNumber, flow.LogId)
           );
           
           if (leadDetails) {
@@ -899,18 +1184,84 @@ const salesFlowService = {
         
         return enrichedFlows;
       }
-      
-      // For other steps, use the original logic
-      const flowsForStep = salesFlows.filter(flow => flow.NextStep == nextStep); // Use == for type coercion
-      
+
+      // Step 7 (Approve payment): step 6 row completed → 7, or main NextStep 7; exclude if step 7 already completed
+      if (nextStep == 7) {
+        const step6CompletedNext7 = salesFlowSteps.filter(
+          (step) =>
+            step &&
+            typeof step === 'object' &&
+            stepIdEquals(step.StepId, 6) &&
+            isStepStatusCompleted(step.Status) &&
+            stepRowNumericNext(step) === 7
+        );
+
+        const flowsForStep = salesFlows.filter((flow) => {
+          if (flow == null || typeof flow !== 'object') return false;
+          const step6Match = step6CompletedNext7.some((s) => logIdEquals(s.LogId, flow.LogId));
+          const mainNextIs7 = flowNumericNextStep(flow) === 7;
+          if (!step6Match && !mainNextIs7) return false;
+
+          const step7 = salesFlowSteps.find(
+            (s) => s && logIdEquals(s.LogId, flow.LogId) && stepIdEquals(s.StepId, 7)
+          );
+          return !step7 || !isStepStatusCompleted(step7.Status);
+        });
+
+        const allLeads = await this.getAllLeads();
+
+        const enrichedFlows = flowsForStep.map((flow) => {
+          const leadDetails = allLeads.find(
+            (lead) =>
+              logIdEquals(lead.LogId, flow.LogId) || logIdEquals(lead.EnquiryNumber, flow.LogId)
+          );
+
+          if (leadDetails) {
+            return {
+              ...flow,
+              FullName: leadDetails.FullName || leadDetails.CustomerName,
+              Email: leadDetails.Email || leadDetails.EmailId,
+              PhoneNumber: leadDetails.PhoneNumber || leadDetails.MobileNumber,
+              CompanyName: leadDetails.CompanyName,
+              Requirement: leadDetails.Requirement,
+              LeadAssignedTo: leadDetails.LeadAssignedTo,
+              CustomerLocation: leadDetails.CustomerLocation,
+              CustomerType: leadDetails.CustomerType,
+              DateOfEntry: leadDetails.DateOfEntry,
+              CreatedBy: leadDetails.CreatedBy,
+              CreatedAt: leadDetails.CreatedAt,
+              UpdatedAt: leadDetails.UpdatedAt,
+              Status: leadDetails.Status,
+              ProductsInterested: leadDetails.ProductsInterested,
+              LeadSource: leadDetails.LeadSource,
+              Priority: leadDetails.Priority,
+              QualificationStatus: leadDetails.QualificationStatus,
+              Notes: leadDetails.Notes,
+              EnquiryNumber: leadDetails.EnquiryNumber,
+              CustomerName: leadDetails.CustomerName,
+              MobileNumber: leadDetails.MobileNumber,
+              EmailId: leadDetails.EmailId
+            };
+          }
+
+          return flow;
+        });
+
+        return enrichedFlows;
+      }
+
+      const flowsForStep = collectFlowsForNextStep(salesFlows, salesFlowSteps, nextStep);
+
       // Get detailed lead information from LogAndQualifyLeads sheet
       const allLeads = await this.getAllLeads();
-      
+
       // Merge sales flow data with detailed lead information
-      const enrichedFlows = flowsForStep.map(flow => {
-        // Find corresponding lead details using LogId (which is now EnquiryNumber)
-        const leadDetails = allLeads.find(lead => 
-          lead.LogId === flow.LogId || lead.EnquiryNumber === flow.LogId
+      const enrichedFlows = flowsForStep.map((flow) => {
+        const flowKey = String(flow.LogId ?? '');
+        const leadDetails = allLeads.find(
+          (lead) =>
+            String(lead.LogId ?? '') === flowKey ||
+            String(lead.EnquiryNumber ?? '') === flowKey
         );
         
         if (leadDetails) {
@@ -1107,50 +1458,54 @@ const salesFlowService = {
       
       // Get sales flows and steps
       const salesFlows = await this.getAllSalesFlows();
-      const salesFlowSteps = await db.getTableRows(table(STEPS_SHEET)).catch(() => []);
-      
-      // Find flows where step 3 is completed and next step is 4
-      const step3Completed = salesFlowSteps.filter(step => 
-        step.StepId === '3' && 
-        step.Status === 'completed' && 
-        step.NextStep === '4'
+      const salesFlowSteps = (await db.getTableRows(table(STEPS_SHEET)).catch(() => [])) || [];
+
+      // Step 3 finished and routed to feasibility (next = 4). Allow numeric StepId / case on Status.
+      const step3Completed = salesFlowSteps.filter(
+        (step) =>
+          step &&
+          typeof step === 'object' &&
+          stepIdEquals(step.StepId, 3) &&
+          isStepStatusCompleted(step.Status) &&
+          stepRowNumericNext(step) === 4
       );
-      
-      // Get flows that match the completed step 3 records AND step 4 is NOT completed
-      const flowsForStep4 = salesFlows.filter(flow => {
-        const step3 = step3Completed.find(s => s.LogId === flow.LogId);
-        if (!step3) return false;
-        
-        // Check if step 4 is already completed for this LogId
-        const step4 = salesFlowSteps.find(s => 
-          s.LogId === flow.LogId && 
-          String(s.StepId) === '4'
+
+      // Include if step-3 row qualifies OR main flow already points to step 4 (covers StepId type bugs in updates)
+      const flowsForStep4 = salesFlows.filter((flow) => {
+        if (flow == null || typeof flow !== 'object') return false;
+        const step3Match = step3Completed.some((s) => logIdEquals(s.LogId, flow.LogId));
+        const mainNextIs4 = flowNumericNextStep(flow) === 4;
+        if (!step3Match && !mainNextIs4) return false;
+
+        const step4 = salesFlowSteps.find(
+          (s) => s && logIdEquals(s.LogId, flow.LogId) && stepIdEquals(s.StepId, 4)
         );
-        
-        // Only include if step 4 doesn't exist or is not completed
-        return !step4 || step4.Status !== 'completed';
+        return !step4 || !isStepStatusCompleted(step4.Status);
       });
       
       // Get InitialCall data to include needs/requirements gathered in step 2
       const initialCallData = await db.getTableRows(table(INITIAL_CALL_SHEET)).catch(() => []);
       
       // Get detailed information for each prospect
-      const feasibilityWithDetails = flowsForStep4.map(flow => {
-        const leadDetails = allLeads.find(lead => 
-          lead.LogId === flow.LogId || lead.EnquiryNumber === flow.LogId
+      const feasibilityWithDetails = flowsForStep4.map((flow) => {
+        const leadDetails = allLeads.find(
+          (lead) =>
+            logIdEquals(lead.LogId, flow.LogId) || logIdEquals(lead.EnquiryNumber, flow.LogId)
         );
-        
-        // Find corresponding InitialCall data (most recent one for this LogId)
-        const initialCallRecords = initialCallData.filter(ic => 
-          ic.LogId === flow.LogId || ic.logId === flow.LogId || ic.EnquiryNumber === flow.LogId
+
+        const initialCallRecords = initialCallData.filter(
+          (ic) =>
+            ic &&
+            (logIdEquals(ic.LogId, flow.LogId) ||
+              logIdEquals(ic.logId, flow.LogId) ||
+              logIdEquals(ic.EnquiryNumber, flow.LogId))
         );
-        const latestInitialCall = initialCallRecords.length > 0 
-          ? initialCallRecords[initialCallRecords.length - 1] 
+        const latestInitialCall = initialCallRecords.length > 0
+          ? initialCallRecords[initialCallRecords.length - 1]
           : null;
-        
-        // Find corresponding step 3 record
-        const step3Record = salesFlowSteps.find(step => 
-          step.LogId === flow.LogId && String(step.StepId) === '3'
+
+        const step3Record = salesFlowSteps.find(
+          (step) => step && logIdEquals(step.LogId, flow.LogId) && stepIdEquals(step.StepId, 3)
         );
         
         if (leadDetails) {
@@ -1330,15 +1685,15 @@ const salesFlowService = {
       
       for (let i = 0; i < salesFlowSteps.length; i++) {
         const step = salesFlowSteps[i];
-        if (step.LogId === logId && step.StepId === stepId) {
+        if (logIdEquals(step.LogId, logId) && stepIdEquals(step.StepId, stepId)) {
           const rowIndex = i + 2;
-          const updatedStep = {
+          const updatedStep = sanitizeSalesFlowStepTimestampsForDb({
             ...step,
             ...updatedData,
             LastModifiedBy: userEmail,
             LastModifiedAt: now
-          };
-          
+          });
+
           await updateRowByIndex(STEPS_SHEET, rowIndex, updatedStep);
           return true;
         }
@@ -1467,9 +1822,9 @@ const salesFlowService = {
           LastModifiedAt: now,
           Note: 'Step 3 ready for evaluation'
         };
-        await db.insertTableRow(table(STEPS_SHEET), step3Record);
+        await db.insertTableRow(table(STEPS_SHEET), sanitizeSalesFlowStepInsert(step3Record));
       }
-      
+
       // 3. Determine next step based on routing
       const routingResult = getNextStep(3, routingContext);
       const nextStep = routingResult.nextStep;
@@ -1591,32 +1946,33 @@ const salesFlowService = {
     try {
       const allLeads = await this.getAllLeads();
       const salesFlows = await this.getAllSalesFlows();
-      const salesFlowSteps = await db.getTableRows(table(STEPS_SHEET));
+      const salesFlowSteps = (await db.getTableRows(table(STEPS_SHEET)).catch(() => [])) || [];
 
-      // Find flows where step 4 is completed and next step is 5
-      const step4CompletedAndNextIs5 = salesFlowSteps.filter(step =>
-        step.StepId === '4' &&
-        step.Status === 'completed' &&
-        step.NextStep === '5'
+      const step4CompletedAndNextIs5 = salesFlowSteps.filter(
+        (step) =>
+          step &&
+          typeof step === 'object' &&
+          stepIdEquals(step.StepId, 4) &&
+          isStepStatusCompleted(step.Status) &&
+          stepRowNumericNext(step) === 5
       );
 
-      const flowsForStep5 = salesFlows.filter(flow => {
-        const step4 = step4CompletedAndNextIs5.find(s => s.LogId === flow.LogId);
-        if (!step4) return false;
-        
-        // Check if step 5 is already completed for this LogId
-        const step5 = salesFlowSteps.find(s => 
-          s.LogId === flow.LogId && 
-          String(s.StepId) === '5'
+      const flowsForStep5 = salesFlows.filter((flow) => {
+        if (flow == null || typeof flow !== 'object') return false;
+        const step4Match = step4CompletedAndNextIs5.some((s) => logIdEquals(s.LogId, flow.LogId));
+        const mainNextIs5 = flowNumericNextStep(flow) === 5;
+        if (!step4Match && !mainNextIs5) return false;
+
+        const step5 = salesFlowSteps.find(
+          (s) => s && logIdEquals(s.LogId, flow.LogId) && stepIdEquals(s.StepId, 5)
         );
-        
-        // Only include if step 5 doesn't exist or is not completed
-        return !step5 || step5.Status !== 'completed';
+        return !step5 || !isStepStatusCompleted(step5.Status);
       });
 
-      const complianceWithDetails = flowsForStep5.map(flow => {
-        const leadDetails = allLeads.find(lead =>
-          lead.LogId === flow.LogId || lead.EnquiryNumber === flow.LogId
+      const complianceWithDetails = flowsForStep5.map((flow) => {
+        const leadDetails = allLeads.find(
+          (lead) =>
+            logIdEquals(lead.LogId, flow.LogId) || logIdEquals(lead.EnquiryNumber, flow.LogId)
         );
 
         if (leadDetails) {
@@ -1708,14 +2064,18 @@ const salesFlowService = {
         
         complianceRecord[header] = value !== undefined ? value : '';
       });
-      await db.insertTableRow(table(CONFIRM_STANDARD_AND_COMPLIANCE_SHEET), complianceRecord);
+      complianceRecord.LogId = logId;
+      await insertComplianceSheetRow(
+        'Standards & compliance sheet',
+        normalizeSheetRowForInsert(complianceRecord)
+      );
 
       const checkedBy = complianceData.checkedBy || complianceData.CheckedBy || 'Quality Engineer';
       const complianceStatusValue = complianceData.ComplianceStatus || complianceData.complianceStatus || '';
 
       // Ensure step 5 exists before updating
       const steps = await db.getTableRows(table(STEPS_SHEET));
-      const step5Exists = steps.find(s => s.LogId === logId && String(s.StepId) === '5');
+      const step5Exists = steps.find((s) => logIdEquals(s.LogId, logId) && stepIdEquals(s.StepId, 5));
 
       if (!step5Exists) {
         const step5Record = {
@@ -1741,7 +2101,7 @@ const salesFlowService = {
           LastModifiedAt: now,
           Note: 'Step 5 ready for compliance check'
         };
-        await db.insertTableRow(table(STEPS_SHEET), step5Record);
+        await db.insertTableRow(table(STEPS_SHEET), sanitizeSalesFlowStepInsert(step5Record));
       }
 
       // 2. Update step 5 (Confirm Standards and Compliance) to completed and move to next step using updateSalesFlowStep
@@ -1795,7 +2155,7 @@ const salesFlowService = {
         Status: 'Sent'
       };
 
-      await db.insertTableRow(table(config.sheets.sendQuotation), quotationRecord);
+      await db.insertSendQuotationRow(quotationRecord);
 
       // 2. Update step 6 (Send Quotation) to completed and move to next step using updateSalesFlowStep
       await this.updateSalesFlowStep(
@@ -1908,24 +2268,46 @@ const salesFlowService = {
   // Get leads for sample submission (next step 8)
   async getSampleSubmissionDetails() {
     try {
-      // Get all leads from LogAndQualifyLeads sheet
       const allLeads = await this.getAllLeads();
-      
-      // Get sales flows with next step 8
       const salesFlows = await this.getAllSalesFlows();
-      const flowsForStep8 = salesFlows.filter(flow => flow.NextStep == 8);
-      
-      // Get quotation documents for each flow
-      const quotationData = await db.getTableRows(table(config.sheets.sendQuotation));
-      
-      // Get detailed information for each prospect
-      const sampleSubmissionWithDetails = flowsForStep8.map(flow => {
-        const leadDetails = allLeads.find(lead => 
-          lead.LogId === flow.LogId || lead.EnquiryNumber === flow.LogId
+      const salesFlowSteps = (await db.getTableRows(table(STEPS_SHEET)).catch(() => [])) || [];
+
+      // Same pattern as step 6: step 7 row completed → 8, or main flow NextStep 8; exclude if step 8 already done
+      const step7CompletedNext8 = salesFlowSteps.filter(
+        (step) =>
+          step &&
+          typeof step === 'object' &&
+          stepIdEquals(step.StepId, 7) &&
+          isStepStatusCompleted(step.Status) &&
+          stepRowNumericNext(step) === 8
+      );
+
+      const flowsForStep8 = salesFlows.filter((flow) => {
+        if (flow == null || typeof flow !== 'object') return false;
+        const step7Match = step7CompletedNext8.some((s) => logIdEquals(s.LogId, flow.LogId));
+        const mainNextIs8 = flowNumericNextStep(flow) === 8;
+        if (!step7Match && !mainNextIs8) return false;
+
+        const step8 = salesFlowSteps.find(
+          (s) => s && logIdEquals(s.LogId, flow.LogId) && stepIdEquals(s.StepId, 8)
         );
-        
-        // Find corresponding quotation document
-        const quotationDoc = quotationData.find(quote => quote.LogId === flow.LogId);
+        return !step8 || !isStepStatusCompleted(step8.Status);
+      });
+
+      const quotationData = await db.getSendQuotationRows();
+
+      const sampleSubmissionWithDetails = flowsForStep8.map((flow) => {
+        const leadDetails = allLeads.find(
+          (lead) =>
+            logIdEquals(lead.LogId, flow.LogId) || logIdEquals(lead.EnquiryNumber, flow.LogId)
+        );
+
+        const quotationDoc = quotationData.find(
+          (quote) =>
+            quote &&
+            (logIdEquals(quote.LogId, flow.LogId) ||
+              logIdEquals(quote.logId, flow.LogId))
+        );
         
         if (leadDetails) {
           return {
@@ -2068,7 +2450,7 @@ const salesFlowService = {
       const allLeads = await this.getAllLeads();
       const salesFlows = await this.getAllSalesFlows();
       const flowsForStep9 = salesFlows.filter(flow => flow.NextStep == 9);
-      const quotationData = await db.getTableRows(table(config.sheets.sendQuotation));
+      const quotationData = await db.getSendQuotationRows();
       const sampleSubmissionData = await db.getTableRows(table(config.sheets.sampleSubmission));
       
       const sampleApprovalWithDetails = flowsForStep9.map(flow => {
@@ -2206,7 +2588,7 @@ const salesFlowService = {
       const allLeads = await this.getAllLeads();
       const salesFlows = await this.getAllSalesFlows();
       const flowsForStep10 = salesFlows.filter(flow => flow.NextStep == 10);
-      const quotationData = await db.getTableRows(table(config.sheets.sendQuotation));
+      const quotationData = await db.getSendQuotationRows();
       const sampleApprovalData = await db.getTableRows(table(config.sheets.getApprovalForSample));
 
       const strategicDealWithDetails = flowsForStep10.map(flow => {
@@ -2410,9 +2792,11 @@ const salesFlowService = {
       const lastPreviousStep = previousSteps.length > 0 
         ? previousSteps.sort((a, b) => parseInt(b.StepId) - parseInt(a.StepId))[0]
         : null;
-      const startTime = lastPreviousStep?.EndTime || step.StartTime || timestamp;
+      const startTime =
+        nullIfBlankTimestamp(lastPreviousStep?.EndTime) ??
+        nullIfBlankTimestamp(step.StartTime) ??
+        timestamp;
 
-      // Build step object with routing information
       const stepObj = {
         StepId: String(currentStep),
         StepNumber: String(currentStep),
@@ -2427,11 +2811,14 @@ const salesFlowService = {
         LastModifiedAt: timestamp,
       };
 
-      // Update the step
-      await updateRowByIndex(STEPS_SHEET, rowIndex, {
-        ...step,
-        ...stepObj,
-      });
+      await updateRowByIndex(
+        STEPS_SHEET,
+        rowIndex,
+        sanitizeSalesFlowStepTimestampsForDb({
+          ...step,
+          ...stepObj,
+        })
+      );
 
       // Update main flow
       const flows = await db.getTableRows(table(SHEET_NAME));

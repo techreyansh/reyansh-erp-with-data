@@ -10,21 +10,29 @@ export const TABLE_NAMES = {
   Users: 'users',
   users: 'users',
 
-  // Clients
-  CLIENT: 'clients',
-  clients: 'clients',
+  // Clients — physical table in Supabase (public.clients2)
+  CLIENT: 'clients2',
+  clients: 'clients2',
   PROSPECTS_CLIENTS: 'prospects_clients',
   prospects_clients: 'prospects_clients',
+  Client_Orders: 'client_orders_data',
+  client_orders: 'client_orders_data',
+  Client_Payments: 'client_payments_data',
+  client_payments: 'client_payments_data',
+  Client_Quotations: 'client_quotations_data',
+  client_quotations: 'client_quotations_data',
+  Client_Notifications: 'client_notifications_data',
+  client_notifications: 'client_notifications_data',
 
   // Vendors & stock
-  Vendor: 'vendors',
-  vendors: 'vendors',
-  Stock: 'stock',
-  stock: 'stock',
-  'Material Inward': 'material_inward',
-  'Material Issue': 'material_issue',
-  BOM: 'bom',
-  'Kitting Sheet': 'kitting_sheet',
+  Vendor: 'vendors_data',
+  vendors: 'vendors_data',
+  Stock: 'stock_data',
+  stock: 'stock_data',
+  'Material Inward': 'material_inward_data',
+  'Material Issue': 'material_issue_data',
+  BOM: 'company_bom_data',
+  'Kitting Sheet': 'company_material_issue_data',
   'Finished Goods': 'finished_goods',
 
   // Dispatches
@@ -32,36 +40,38 @@ export const TABLE_NAMES = {
   dispatches: 'dispatches',
 
   // Purchase flow
-  Purchase_Flow: 'purchase_flows',
-  PurchaseFlow: 'purchase_flows',
-  purchase_flows: 'purchase_flows',
-  PurchaseFlowSteps: 'purchase_flow_steps',
-  purchase_flow_steps: 'purchase_flow_steps',
+  Purchase_Flow: 'purchase_flow_data',
+  PurchaseFlow: 'purchase_flow_data',
+  purchase_flows: 'purchase_flow_data',
+  PurchaseFlowSteps: 'purchase_flow_steps_data',
+  purchase_flow_steps: 'purchase_flow_steps_data',
 
   // Sales flow
-  SalesFlow: 'sales_flows',
-  sales_flows: 'sales_flows',
-  SalesFlowSteps: 'sales_flow_steps',
-  sales_flow_steps: 'sales_flow_steps',
-  LogAndQualifyLeads: 'log_and_qualify_leads',
-  InitialCall: 'initial_call',
+  SalesFlow: 'sales_flow_data',
+  sales_flows: 'sales_flow_data',
+  SalesFlowSteps: 'sales_flow_steps_data',
+  sales_flow_steps: 'sales_flow_steps_data',
+  LogAndQualifyLeads: 'log_and_qualify_leads_data',
+  InitialCall: 'initial_call_data',
+  // Migration 20250223100000: public.send_quotation (legacy deploys may use send_quotation_data)
   SendQuotation: 'send_quotation',
-  ApprovePaymentTerms: 'approve_payment_terms',
-  SampleSubmission: 'sample_submission',
-  GetApprovalForSample: 'get_approval_for_sample',
-  ApproveStrategicDeals: 'approve_strategic_deals',
-  EvaluateHighValueProspects: 'evaluate_high_value_prospects',
-  CheckFeasibility: 'check_feasibility',
+  ApprovePaymentTerms: 'approve_payment_terms_data',
+  SampleSubmission: 'sample_submission_data',
+  GetApprovalForSample: 'get_approval_for_sample_data',
+  ApproveStrategicDeals: 'approve_strategic_deals_data',
+  EvaluateHighValueProspects: 'evaluate_high_value_prospects_data',
+  CheckFeasibility: 'check_feasibility_data',
+  // Matches supabase/migrations/20250223100000_replace_sheet_rows_with_entity_tables.sql (not *_data).
   ConfirmStandardAndCompliance: 'confirm_standard_and_compliance',
-  FollowUpQuotations: 'follow_up_quotations',
-  'Comparative Statement': 'comparative_statement',
-  SheetApproveQuotation: 'sheet_approve_quotation',
-  RequestSample: 'request_sample',
-  InspectMaterial: 'inspect_material',
+  FollowUpQuotations: 'follow_up_quotations_data',
+  'Comparative Statement': 'comparative_statement_data',
+  SheetApproveQuotation: 'sheet_approve_quotation_data',
+  RequestSample: 'request_sample_data',
+  InspectMaterial: 'inspect_material_data',
   MaterialApproval: 'material_approval',
-  PlacePO: 'place_po',
-  ReturnHistory: 'return_history',
-  GenerateGRN: 'generate_grn',
+  PlacePO: 'place_po_data',
+  ReturnHistory: 'return_history_data',
+  GenerateGRN: 'generate_grn_data',
   SchedulePayment: 'schedule_payment',
   ReleasePayment: 'release_payment',
 
@@ -76,19 +86,107 @@ export const TABLE_NAMES = {
   po_master: 'po_master',
   Daily_CAPACITY: 'daily_capacity',
   daily_capacity: 'daily_capacity',
-  RFQ: 'rfq',
-  rfq: 'rfq',
+  'Cable Products': 'cable_products',
+  cable_products: 'cable_products',
+  'Cable Production Plans': 'cable_production_plans',
+  cable_production_plans: 'cable_production_plans',
+  'Machine Schedules': 'machine_schedules',
+  machine_schedules: 'machine_schedules',
+  RFQ: 'rfq_data',
+  rfq: 'rfq_data',
   BOM_Templates: 'bom_templates',
   bom_templates: 'bom_templates',
-  SortVendor: 'sort_vendor',
-  sort_vendor: 'sort_vendor',
-  FollowUpDelivery: 'follow_up_delivery',
-  follow_up_delivery: 'follow_up_delivery',
-  ReturnMaterial: 'return_material',
-  return_material: 'return_material',
-  InspectSample: 'inspect_sample',
-  inspect_sample: 'inspect_sample',
+  SortVendor: 'sort_vendor_data',
+  sort_vendor: 'sort_vendor_data',
+  FollowUpDelivery: 'follow_up_delivery_data',
+  follow_up_delivery: 'follow_up_delivery_data',
+  ReturnMaterial: 'return_material_data',
+  return_material: 'return_material_data',
+  InspectSample: 'inspect_sample_data',
+  inspect_sample: 'inspect_sample_data',
+
+  // HR / admin custom data tables
+  Employees: 'employees_data',
+  employees: 'employees_data',
+  Performance: 'performance_data',
+  performance: 'performance_data',
+  Attendance: 'attendance_data',
+  attendance: 'attendance_data',
+  EmployeeTasks: 'employee_tasks_data',
+  employee_tasks: 'employee_tasks_data',
+  Notifications: 'notifications_data',
+  notifications: 'notifications_data',
 };
+
+/** True when table is not the wrapped shape (id, sort_order, record jsonb) — use select * / direct rows. */
+function isLegacyJsonSchemaError(error) {
+  if (!error) return false;
+  // PostgREST/Postgres: column does not exist (e.g. flat "sheet" tables like clients2)
+  if (String(error.code || '') === '42703') return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return (
+    msg.includes('sort_order') ||
+    msg.includes('record') ||
+    msg.includes('created_at') ||
+    (msg.includes('column') && msg.includes('does not exist'))
+  );
+}
+
+function isPostgrestMissingTableError(error) {
+  if (!error) return false;
+  const m = String(error.message || error.details || error.hint || '').toLowerCase();
+  return (
+    m.includes('schema cache') ||
+    m.includes('pgrst205') ||
+    m.includes('could not find the table') ||
+    (m.includes('relation') && m.includes('does not exist'))
+  );
+}
+
+const SEND_QUOTATION_PHYSICAL = ['send_quotation', 'send_quotation_data'];
+
+/**
+ * Read SendQuotation rows from whichever physical table exists (migration name first).
+ */
+export async function getSendQuotationRows() {
+  let lastErr;
+  for (const name of SEND_QUOTATION_PHYSICAL) {
+    try {
+      return await getTableRows(name);
+    } catch (err) {
+      lastErr = err;
+      if (isPostgrestMissingTableError(err)) continue;
+      throw err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  return [];
+}
+
+/**
+ * Insert into send_quotation / send_quotation_data depending on project schema.
+ */
+export async function insertSendQuotationRow(row) {
+  let lastErr;
+  for (const name of SEND_QUOTATION_PHYSICAL) {
+    try {
+      await insertTableRow(name, row);
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (isPostgrestMissingTableError(err)) continue;
+      throw err;
+    }
+  }
+  throw lastErr || new Error('Send quotation table not available');
+}
+
+const isDev = () => typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+
+function debugGetTableRows(phase, payload) {
+  if (!isDev()) return;
+  console.log('[db.getTableRows]', phase, payload);
+}
 
 /**
  * Resolve logical sheet/table name to actual table name.
@@ -108,12 +206,13 @@ export function getTableName(logicalName) {
 
 /**
  * Get all rows from a table as flattened objects { id, ...record }.
- * @param {string} tableName - actual table name (e.g. 'users', 'clients')
+ * @param {string} tableName - actual table name (e.g. 'users', 'clients2')
  * @returns {Promise<Array<{ id: string, ... }>>}
  */
 export async function getTableRows(tableName) {
   const name = getTableName(tableName);
-  if (config.useLocalStorage) return [];
+  debugGetTableRows('invoke', { tableName, resolvedName: name, useLocalStorage: config.useLocalStorage });
+  console.log('Using Supabase, not local storage');
 
   const { data: rows, error } = await supabase
     .from(name)
@@ -122,10 +221,24 @@ export async function getTableRows(tableName) {
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error(`Error getTableRows(${name}):`, error);
-    throw error;
+    debugGetTableRows('primary select error', { resolvedName: name, error });
+    // Fallback for direct-column tables (no sort_order/record wrapper)
+    if (!isLegacyJsonSchemaError(error)) {
+      console.error(`Error getTableRows(${name}):`, error);
+      throw error;
+    }
+    // Legacy flat tables may omit created_at/sort_order/record — select all columns, no order.
+    const { data: directRows, error: directErr } = await supabase.from(name).select('*');
+    if (directErr) {
+      console.error(`Error getTableRows(${name}) [direct]:`, directErr);
+      debugGetTableRows('fallback select error', { resolvedName: name, error: directErr });
+      throw directErr;
+    }
+    debugGetTableRows('fallback success', { resolvedName: name, rowCount: (directRows || []).length });
+    return directRows || [];
   }
 
+  debugGetTableRows('success', { resolvedName: name, rowCount: (rows || []).length });
   return (rows || []).map((r) => ({
     id: r.id,
     ...(r.record || {}),
@@ -140,27 +253,43 @@ export async function getTableRows(tableName) {
  */
 export async function insertTableRow(tableName, row) {
   const name = getTableName(tableName);
-  if (config.useLocalStorage) return {};
+  const safeRow =
+    typeof row === 'object' && row !== null && !Array.isArray(row) ? { ...row } : {};
 
-  const { data: maxRow } = await supabase
+  let nextOrder = 0;
+  const { data: maxRow, error: maxErr } = await supabase
     .from(name)
     .select('sort_order')
     .order('sort_order', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const nextOrder = (maxRow?.sort_order ?? -1) + 1;
-  const payload = {
-    sort_order: nextOrder,
-    record: typeof row === 'object' && row !== null && !Array.isArray(row)
-      ? row
-      : {},
-  };
+  if (!maxErr && typeof maxRow?.sort_order === 'number') {
+    nextOrder = maxRow.sort_order + 1;
+  } else if (maxErr && !isLegacyJsonSchemaError(maxErr)) {
+    console.error(`Error insertTableRow(${name}) [max sort]:`, maxErr);
+    throw maxErr;
+  }
 
-  const { error } = await supabase.from(name).insert(payload);
-  if (error) {
-    console.error(`Error insertTableRow(${name}):`, error);
-    throw error;
+  /** Prefer jsonb `record` (canonical sheet migration). Do not skip this when sort_order query failed. */
+  const wrappedAttempts = [
+    { sort_order: nextOrder, record: safeRow },
+    { record: safeRow },
+  ];
+
+  for (const payload of wrappedAttempts) {
+    const { error } = await supabase.from(name).insert(payload);
+    if (!error) return {};
+    if (!isLegacyJsonSchemaError(error)) {
+      console.error(`Error insertTableRow(${name}):`, error);
+      throw error;
+    }
+  }
+
+  const { error: directErr } = await supabase.from(name).insert(safeRow);
+  if (directErr) {
+    console.error(`Error insertTableRow(${name}) [direct]:`, directErr);
+    throw directErr;
   }
   return {};
 }
@@ -173,16 +302,27 @@ export async function insertTableRow(tableName, row) {
  */
 export async function updateTableRowById(tableName, id, row) {
   const name = getTableName(tableName);
-  if (config.useLocalStorage) return;
 
   const { error } = await supabase
     .from(name)
     .update({ record: row || {} })
     .eq('id', id);
 
-  if (error) {
+  if (!error) return;
+  if (!isLegacyJsonSchemaError(error)) {
     console.error(`Error updateTableRowById(${name}, ${id}):`, error);
     throw error;
+  }
+
+  const directPayload = row && typeof row === 'object' ? row : {};
+  const { error: directErr } = await supabase
+    .from(name)
+    .update(directPayload)
+    .eq('id', id);
+
+  if (directErr) {
+    console.error(`Error updateTableRowById(${name}, ${id}) [direct]:`, directErr);
+    throw directErr;
   }
 }
 
@@ -193,7 +333,6 @@ export async function updateTableRowById(tableName, id, row) {
  */
 export async function deleteTableRowById(tableName, id) {
   const name = getTableName(tableName);
-  if (config.useLocalStorage) return;
 
   const { error } = await supabase.from(name).delete().eq('id', id);
   if (error) {
@@ -250,15 +389,50 @@ export async function getTableHeaders(tableName) {
  */
 export async function batchInsertTableRows(tableName, rows) {
   const name = getTableName(tableName);
-  if (config.useLocalStorage || !rows?.length) return;
+  if (!rows?.length) return;
+
+  const normalizeRow = (row) =>
+    Array.isArray(row)
+      ? Object.fromEntries(row.map((v, j) => [`col_${j}`, v]))
+      : (row && typeof row === 'object' ? row : {});
+
   let nextOrder = -1;
-  const { data: maxRow } = await supabase.from(name).select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
-  if (maxRow?.sort_order != null) nextOrder = maxRow.sort_order;
+  const { data: maxRow, error: maxErr } = await supabase
+    .from(name)
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let shouldFallbackToDirect = !!maxErr && isLegacyJsonSchemaError(maxErr);
+  let legacyFailedMidway = false;
+
+  if (!maxErr) {
+    if (maxRow?.sort_order != null) nextOrder = maxRow.sort_order;
+    for (let i = 0; i < rows.length; i++) {
+      nextOrder += 1;
+      const record = normalizeRow(rows[i]);
+      const { error } = await supabase.from(name).insert({ sort_order: nextOrder, record });
+      if (error) {
+        if (isLegacyJsonSchemaError(error)) {
+          legacyFailedMidway = true;
+          break;
+        }
+        throw error;
+      }
+    }
+    if (!legacyFailedMidway) return;
+    shouldFallbackToDirect = true;
+  } else if (!isLegacyJsonSchemaError(maxErr)) {
+    throw maxErr;
+  }
+
+  if (!shouldFallbackToDirect) return;
+
   for (let i = 0; i < rows.length; i++) {
-    nextOrder += 1;
-    const row = rows[i];
-    const record = Array.isArray(row) ? Object.fromEntries(row.map((v, j) => [`col_${j}`, v])) : (row && typeof row === 'object' ? row : {});
-    await supabase.from(name).insert({ sort_order: nextOrder, record });
+    const directPayload = normalizeRow(rows[i]);
+    const { error } = await supabase.from(name).insert(directPayload);
+    if (error) throw error;
   }
 }
 
@@ -317,7 +491,9 @@ export async function getLatestDispatchLimitRange(tableName = 'daily_capacity', 
 export default {
   getTableName,
   getTableRows,
+  getSendQuotationRows,
   insertTableRow,
+  insertSendQuotationRow,
   updateTableRowById,
   deleteTableRowById,
   updateRowByIndex,

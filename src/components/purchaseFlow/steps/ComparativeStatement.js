@@ -44,6 +44,14 @@ import config from '../../../config/config';
 import { useAuth } from '../../../context/AuthContext';
 import purchaseFlowService from '../../../services/purchaseFlowService';
 
+/** Price may be a string from inputs or a number from JSON — never call .trim() on it directly. */
+function comparativeVendorPriceFilled(vendorData) {
+  if (!vendorData) return false;
+  const p = vendorData.price;
+  if (p == null || p === '') return false;
+  return String(p).trim() !== '';
+}
+
 const ComparativeStatement = ({ onComplete }) => {
   const { user } = useAuth();
   const theme = useTheme();
@@ -66,11 +74,11 @@ const ComparativeStatement = ({ onComplete }) => {
   // Update state to track saved status per vendor per item
   const [savedVendors, setSavedVendors] = useState({});
 
-  // Check if comparative statement is prepared for an indent
-  const isComparativePrepared = (indent) => {
+  // Check if comparative statement is prepared for an indent (optionally pass data snapshot, e.g. after save merge)
+  const isComparativePrepared = (indent, dataSource) => {
+    const data = dataSource ?? comparativeData;
     if (!indent || !indent.Items || indent.Items.length === 0) return false;
-    
-    // Handle case where Items might be a JSON string or an object
+
     let itemsArray = indent.Items;
     if (typeof indent.Items === 'string') {
       try {
@@ -83,55 +91,51 @@ const ComparativeStatement = ({ onComplete }) => {
       itemsArray = Object.values(itemsArray);
     }
     if (!Array.isArray(itemsArray) || itemsArray.length === 0) return false;
-    
-    // Check if all items have comparative data with prices for all vendors
+
     for (const item of itemsArray) {
       if (!item.vendors || item.vendors.length === 0) return false;
-      
-      const itemData = comparativeData[item.itemCode];
+
+      const itemCode = item.itemCode ?? item.ItemCode;
+      const itemData = data[itemCode];
       if (!itemData) return false;
-      
-      // Check if all vendors have price data
+
       for (const vendor of item.vendors) {
-        const vendorData = itemData[vendor.vendorCode];
-        if (!vendorData || !vendorData.price || vendorData.price.trim() === '') {
-          return false;
-        }
+        const vCode = vendor.vendorCode ?? vendor.VendorCode;
+        const vendorData = itemData[vCode];
+        if (!comparativeVendorPriceFilled(vendorData)) return false;
       }
     }
     return true;
   };
 
-  // Load initial data
+  // Optional legacy sheet preload (does not drive list loading — avoids racing fetchIndents / isLoading)
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        setIsLoading(true);
         const flowData = await sheetService.getSheetData(config.sheets.purchaseFlow);
-        const activeFlow = flowData.find(flow => flow.Status === 'In Progress');
+        const activeFlow = flowData.find((flow) => flow.Status === 'In Progress');
         if (activeFlow) {
           setCurrentFlowId(activeFlow.FlowId);
         }
 
-        // Get existing data
         const existingData = await sheetService.getSheetData(config.sheets.purchaseFlowSteps);
-        const currentStep = existingData.find(record => 
-          record.FlowId === currentFlowId && record.StepId === 5
+        const currentStep = existingData.find(
+          (record) => record.FlowId === activeFlow?.FlowId && String(record.StepId) === '5'
         );
 
-        if (currentStep && currentStep.Items) {
+        if (currentStep?.Items) {
           try {
-            const savedItems = JSON.parse(currentStep.Items);
-            setItems(savedItems);
+            const savedItems =
+              typeof currentStep.Items === 'string'
+                ? JSON.parse(currentStep.Items)
+                : currentStep.Items;
+            if (Array.isArray(savedItems)) setItems(savedItems);
           } catch (e) {
             console.error('Error parsing saved items:', e);
           }
         }
       } catch (err) {
         console.error('Error loading initial data:', err);
-        setError('Failed to load saved data');
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -469,16 +473,18 @@ const ComparativeStatement = ({ onComplete }) => {
   // Update checkIndentCompletion to work with itemCode structure
   const checkIndentCompletion = (indent) => {
     if (!indent.Items || indent.Items.length === 0) return false;
-    
+
     for (const item of indent.Items) {
       if (!item.vendors || item.vendors.length === 0) return false;
-      
-      const itemData = comparativeData[item.itemCode];
+
+      const itemCode = item.itemCode ?? item.ItemCode;
+      const itemData = comparativeData[itemCode];
       if (!itemData) return false;
       
       for (const vendor of item.vendors) {
-        const vendorData = itemData[vendor.vendorCode];
-        if (!vendorData || !vendorData.price) return false;
+        const vCode = vendor.vendorCode ?? vendor.VendorCode;
+        const vendorData = itemData[vCode];
+        if (!comparativeVendorPriceFilled(vendorData)) return false;
       }
     }
     return true;
@@ -487,16 +493,18 @@ const ComparativeStatement = ({ onComplete }) => {
   // Update checkIndentCompletionWithData to work with itemCode structure
   const checkIndentCompletionWithData = (indent, data) => {
     if (!indent.Items || indent.Items.length === 0) return false;
-    
+
     for (const item of indent.Items) {
       if (!item.vendors || item.vendors.length === 0) return false;
-      
-      const itemData = data[item.itemCode];
+
+      const itemCode = item.itemCode ?? item.ItemCode;
+      const itemData = data[itemCode];
       if (!itemData) return false;
-      
+
       for (const vendor of item.vendors) {
-        const vendorData = itemData[vendor.vendorCode];
-        if (!vendorData || !vendorData.price) return false;
+        const vCode = vendor.vendorCode ?? vendor.VendorCode;
+        const vendorData = itemData[vCode];
+        if (!comparativeVendorPriceFilled(vendorData)) return false;
       }
     }
     return true;
@@ -540,9 +548,10 @@ const ComparativeStatement = ({ onComplete }) => {
         }
         
         for (const item of itemsArray) {
-          const itemData = comparativeData[item.itemCode];
+          const ic = item.itemCode ?? item.ItemCode;
+          const itemData = comparativeData[ic];
           if (itemData) {
-            indentComparativeData[item.itemCode] = itemData;
+            indentComparativeData[ic] = itemData;
           }
         }
       }
@@ -631,57 +640,56 @@ const ComparativeStatement = ({ onComplete }) => {
         existingData = {};
       }
       
-      // Merge existing data with current data
-      const mergedData = {
-        ...existingData,
-        ...comparativeData
-      };
-      
-      // Save comparative statement with merged data
+      // Deep-merge per item so other items/vendors from DB are not dropped
+      const mergedData = { ...existingData };
+      for (const ic of Object.keys(comparativeData || {})) {
+        mergedData[ic] = {
+          ...(existingData[ic] || {}),
+          ...(comparativeData[ic] || {}),
+        };
+      }
+
       await purchaseFlowService.saveComparativeStatement({
         indentNumber: selectedIndent.IndentNumber,
         comparativeData: mergedData,
         userEmail: user?.email || 'system',
       });
-      
-      // Update local state with merged data
+
       setComparativeData(mergedData);
-      
-      // Mark specific vendors as saved for this item
-      const itemCode = selectedIndent.selectedItem.itemCode;
+
+      const itemCode = selectedIndent.selectedItem.itemCode ?? selectedIndent.selectedItem.ItemCode;
       const savedKey = `${selectedIndent.IndentNumber}_${itemCode}`;
       const currentSavedVendors = savedVendors[savedKey] || {};
-      
-      // Mark all vendors in the current item as saved
       const updatedSavedVendors = { ...currentSavedVendors };
-      selectedIndent.selectedItem.vendors.forEach(vendor => {
-        const vendorData = comparativeData[itemCode]?.[vendor.vendorCode];
-        if (vendorData && vendorData.price) {
-          updatedSavedVendors[vendor.vendorCode] = true;
+      selectedIndent.selectedItem.vendors.forEach((vendor) => {
+        const vCode = vendor.vendorCode ?? vendor.VendorCode;
+        const vendorData = mergedData[itemCode]?.[vCode];
+        if (comparativeVendorPriceFilled(vendorData)) {
+          updatedSavedVendors[vCode] = true;
         }
       });
-      
-      setSavedVendors(prev => ({
+
+      setSavedVendors((prev) => ({
         ...prev,
-        [savedKey]: updatedSavedVendors
+        [savedKey]: updatedSavedVendors,
       }));
-      
-      // Update completion status for the indent
-      const indent = indents.find(i => i.IndentNumber === selectedIndent.IndentNumber);
+
+      const indent = indents.find((i) => i.IndentNumber === selectedIndent.IndentNumber);
       if (indent) {
-        const isComplete = isComparativePrepared(indent);
-        setIndentCompletionStatus(prev => ({
+        const isComplete = isComparativePrepared(indent, mergedData);
+        setIndentCompletionStatus((prev) => ({
           ...prev,
-          [selectedIndent.IndentNumber]: isComplete
+          [selectedIndent.IndentNumber]: isComplete,
         }));
       }
-      
+
       setSnackbar({ open: true, message: 'Comparative statement saved!', severity: 'success' });
       setDialogOpen(false);
       setSelectedIndent(null);
-      
     } catch (err) {
-      setError(err.message || String(err));
+      const msg = err?.message || String(err);
+      setError(msg);
+      setSnackbar({ open: true, message: `Save failed: ${msg}`, severity: 'error' });
     } finally {
       setIsSaving(false);
     }

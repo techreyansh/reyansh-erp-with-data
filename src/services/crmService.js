@@ -2,6 +2,7 @@ import sheetService from './sheetService';
 import config from '../config/config';
 import { getAllClients } from './clientService';
 import salesFlowService from './salesFlowService';
+import { parseJsonArray } from '../utils/parseJsonField';
 
 const CRM_SHEETS = {
   opportunities: 'CRM_Opportunities',
@@ -52,7 +53,7 @@ const crmService = {
         actualCloseDate: row.ActualCloseDate || '',
         source: row.Source || '',
         assignedTo: row.AssignedTo || '',
-        products: row.Products ? JSON.parse(row.Products) : [],
+        products: parseJsonArray(row.Products),
         notes: row.Notes || '',
         status: row.Status || 'Active', // Active, Closed, Lost
         createdBy: row.CreatedBy || '',
@@ -268,7 +269,7 @@ const crmService = {
         dateTime: row.DateTime || '',
         duration: parseInt(row.Duration) || 0,
         status: row.Status || '', // Sent, Received, Read, Replied
-        attachments: row.Attachments ? JSON.parse(row.Attachments) : [],
+        attachments: parseJsonArray(row.Attachments),
         createdBy: row.CreatedBy || '',
         createdAt: row.CreatedAt || ''
       }));
@@ -395,7 +396,7 @@ const crmService = {
         title: row.Title || '',
         content: row.Content || '',
         category: row.Category || 'General',
-        tags: row.Tags ? JSON.parse(row.Tags) : [],
+        tags: parseJsonArray(row.Tags),
         createdBy: row.CreatedBy || '',
         createdAt: row.CreatedAt || '',
         updatedAt: row.UpdatedAt || ''
@@ -499,7 +500,7 @@ const crmService = {
         amount: parseFloat(row.Amount) || 0,
         currency: row.Currency || 'INR',
         status: row.Status || 'Pending',
-        products: row.Products ? JSON.parse(row.Products) : [],
+        products: parseJsonArray(row.Products),
         notes: row.Notes || '',
         createdBy: row.CreatedBy || '',
         createdAt: row.CreatedAt || '',

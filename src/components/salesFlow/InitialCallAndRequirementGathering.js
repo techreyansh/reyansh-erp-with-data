@@ -35,7 +35,7 @@ import {
   MenuItem
 } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import salesFlowService from '../../services/salesFlowService';
 import { 
   Save, 
@@ -66,6 +66,7 @@ const InitialCallAndRequirementGathering = () => {
   const theme = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const [loading, setLoading] = useState(false);
   const [leads, setLeads] = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -76,24 +77,32 @@ const InitialCallAndRequirementGathering = () => {
 
   useEffect(() => {
     loadLeadsForStep2();
-  }, []);
+  }, [routerLocation.pathname, routerLocation.key]);
 
   const loadLeadsForStep2 = async () => {
+    setLoading(true);
+    let leadsData = [];
+    let productsData = [];
     try {
-      setLoading(true);
-      const [leadsData, productsData] = await Promise.all([
-        salesFlowService.getLeadsByNextStep(2),
-        salesFlowService.getProducts()
-      ]);
-      setLeads(leadsData);
-      setProducts(productsData);
-    } catch (error) {
-      console.error('Error loading leads:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load leads',
-        severity: 'error'
-      });
+      try {
+        leadsData = await salesFlowService.getLeadsByNextStep(2);
+      } catch (leadsErr) {
+        console.error('Error loading leads:', leadsErr);
+        const detail =
+          leadsErr?.message || leadsErr?.details || (typeof leadsErr === 'string' ? leadsErr : '');
+        setSnackbar({
+          open: true,
+          message: detail ? `Failed to load leads: ${detail}` : 'Failed to load leads',
+          severity: 'error'
+        });
+      }
+      try {
+        productsData = await salesFlowService.getProducts();
+      } catch (productsErr) {
+        console.error('Error loading products:', productsErr);
+      }
+      setLeads(Array.isArray(leadsData) ? leadsData : []);
+      setProducts(Array.isArray(productsData) ? productsData : []);
     } finally {
       setLoading(false);
     }

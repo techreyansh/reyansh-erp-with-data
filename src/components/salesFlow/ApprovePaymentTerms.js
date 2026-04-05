@@ -94,6 +94,10 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
+function sameLogId(a, b) {
+  return String(a ?? '') === String(b ?? '');
+}
+
 const ApprovePaymentTerms = () => {
   const theme = useTheme();
   const { user } = useAuth();
@@ -126,9 +130,10 @@ const ApprovePaymentTerms = () => {
       setQuotations(quotationsData);
     } catch (error) {
       console.error('Error loading leads:', error);
+      const detail = error?.message || error?.details || String(error);
       setSnackbar({
         open: true,
-        message: 'Failed to load leads',
+        message: detail ? `Failed to load leads or quotations: ${detail}` : 'Failed to load leads or quotations',
         severity: 'error'
       });
     } finally {
@@ -137,7 +142,9 @@ const ApprovePaymentTerms = () => {
   };
 
   const getQuotationForLead = (logId) => {
-    return quotations.find(q => q.LogId === logId);
+    return quotations.find(
+      (q) => q && (sameLogId(q.LogId, logId) || sameLogId(q.logId, logId))
+    );
   };
 
   const handleViewDetails = (lead) => {

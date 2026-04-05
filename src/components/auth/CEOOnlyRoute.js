@@ -11,12 +11,12 @@ import ceoDashboardAccessLog from '../../services/ceoDashboardAccessLog';
  * All access attempts are logged. Backend must validate CEO role server-side when APIs exist.
  */
 const CEOOnlyRoute = ({ children }) => {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const location = useLocation();
   const logged = useRef(false);
 
   useEffect(() => {
-    if (loading || !user) return;
+    if (authLoading || !user) return;
     const granted = role === 'CEO';
     if (!logged.current) {
       ceoDashboardAccessLog.logAccessAttempt({
@@ -26,9 +26,9 @@ const CEOOnlyRoute = ({ children }) => {
       });
       logged.current = true;
     }
-  }, [loading, user]);
+  }, [authLoading, user]);
 
-  if (loading) {
+  if (authLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
         <Typography variant="body2" color="text.secondary">Checking access...</Typography>

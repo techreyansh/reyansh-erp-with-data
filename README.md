@@ -1,3 +1,25 @@
+# Reyansh ERP (React + Supabase)
+
+Internal ERP-style web app: sales flow, purchase flow, CRM, inventory-related screens, and more. Frontend is **Create React App** (React 18); data and auth use **Supabase** (Postgres + REST + Storage).
+
+## Quick start
+
+1. **Clone** this repository.
+2. **Install:** `npm ci` (or `npm install`).
+3. **Environment:** copy `.env.example` to `.env.local` and set at least:
+   - `REACT_APP_SUPABASE_URL`
+   - `REACT_APP_SUPABASE_ANON_KEY` (and/or publishable key per `.env.example`)
+   - Optional: `REACT_APP_GOOGLE_OAUTH_CLIENT_ID`, `REACT_APP_WHATSAPP_LINK`, `REACT_APP_OAUTH_REDIRECT_URL` for production OAuth.
+4. **Database:** create a Supabase project and apply SQL under `supabase/migrations/` in order (or use [Supabase CLI](https://supabase.com/docs/guides/cli) `db push` against your linked project). Do not commit real keys; `.env` and `.env.local` are gitignored.
+5. **Run dev:** `npm start` → [http://localhost:3000](http://localhost:3000).
+6. **Production build:** `npm run build` → static files in `build/` (deploy to Vercel, Netlify, Cloudflare Pages, etc.; configure SPA fallback to `index.html` and the same `REACT_APP_*` vars in the host’s dashboard).
+
+## Repository
+
+- Remote for this line: [techreyansh/reyansh-erp-with-data](https://github.com/techreyansh/reyansh-erp-with-data).
+
+---
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

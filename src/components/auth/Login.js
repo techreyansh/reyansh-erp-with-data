@@ -16,15 +16,15 @@ import {
   Grow,
 } from "@mui/material";
 import {
-  Google,
   Factory,
   Dashboard,
   TrendingUp,
   Security,
 } from "@mui/icons-material";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../../context/AuthContext";
-import LoadingSpinner from "../common/LoadingSpinner";
 import { supabase } from "../../lib/supabaseClient";
+import { getGoogleWebClientId } from "../../lib/googleWebClientId";
 
 const Login = () => {
   const theme = useTheme();
@@ -35,15 +35,11 @@ const Login = () => {
     { icon: <Factory />, text: "Executive Dashboard with KPIs", color: theme.palette.warning.main },
   ];
   
-  // useAuth provides authentication methods and state
-  const {
-    loading: authLoading,
-    isAuthenticated,
-    error: authError,
-  } = useAuth();
+  const { error: authError, authLoading, syncUserFromSupabase, clearAuthSurfaceErrors } = useAuth();
+  const googleWebClientId = getGoogleWebClientId();
   const navigate = useNavigate();
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [oauthStarting, setOauthStarting] = useState(false);
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState(null);
 
   // Check for session expiration message from URL
@@ -56,35 +52,53 @@ const Login = () => {
     }
   }, []);
 
-  // Redirect to dashboard if already authenticated
+  // After auth hydrates: push Supabase session into React state, then route (ProtectedRoute reads `user`, not getSession)
   useEffect(() => {
-    if (isAuthenticated) navigate("/dashboard");
-  }, [isAuthenticated, navigate]);
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const { error: signInError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-        },
-      });
-      if (signInError) {
-        console.error("Supabase OAuth error:", signInError);
-        setError("Failed to sign in with Google");
+    if (authLoading) return undefined;
+    let cancelled = false;
+    (async () => {
+      const hasSession = await syncUserFromSupabase();
+      if (cancelled) return;
+      if (hasSession) {
+        navigate("/dashboard", { replace: true });
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, navigate, syncUserFromSupabase]);
+
+  /** Requires REACT_APP_GOOGLE_OAUTH_CLIENT_ID — redirect OAuth is disabled (it hits "Unable to exchange external code"). */
+  const handleGoogleCredential = async (credentialResponse) => {
+    const token = credentialResponse?.credential;
+    if (!token) {
+      setError("Google did not return a sign-in token.");
+      return;
+    }
+    clearAuthSurfaceErrors();
+    setOauthStarting(true);
+    try {
+      const { error: idErr } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token,
+      });
+      if (idErr) {
+        console.error("signInWithIdToken:", idErr);
+        setError(
+          idErr.message ||
+            "Google token was rejected by Supabase. Enable Google provider and use the same Web Client ID in Dashboard and in REACT_APP_GOOGLE_OAUTH_CLIENT_ID."
+        );
+        return;
+      }
+      await syncUserFromSupabase();
+      navigate("/dashboard", { replace: true });
     } catch (e) {
-      console.error("Error starting Supabase OAuth:", e);
-      setError("Failed to sign in with Google");
+      console.error("Google ID sign-in exception:", e);
+      setError("Google sign-in failed unexpectedly.");
     } finally {
-      setLoading(false);
+      setOauthStarting(false);
     }
   };
-
-  // Show loading spinner if authenticating
-  if (authLoading || loading) return <LoadingSpinner message="Signing in..." />;
 
   return (
     <Box
@@ -392,6 +406,45 @@ const Login = () => {
                       </Grow>
                     )}
 
+                    {!googleWebClientId && (
+                      <Grow in timeout={250}>
+                        <Alert severity="warning" sx={{ mb: 3, borderRadius: 3 }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                            Google sign-in is misconfigured for this project
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 1 }}>
+                            In the project root file <code style={{ fontSize: "0.85em" }}>.env</code>, the line{" "}
+                            <code style={{ fontSize: "0.85em" }}>REACT_APP_GOOGLE_OAUTH_CLIENT_ID</code> must
+                            have your real <strong>Web Client ID</strong> after the <code>=</code>. If there is
+                            nothing after <code>=</code>, the button stays hidden.
+                          </Typography>
+                          <Typography variant="body2" sx={{ mb: 1 }}>
+                            Copy the Client ID from: Supabase → <strong>Authentication</strong> →{" "}
+                            <strong>Providers</strong> → <strong>Google</strong> (same value you already use
+                            there).
+                          </Typography>
+                          <Typography
+                            component="pre"
+                            sx={{
+                              m: 0,
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: "grey.100",
+                              fontSize: "0.8rem",
+                              overflow: "auto",
+                            }}
+                          >
+                            REACT_APP_GOOGLE_OAUTH_CLIENT_ID=123456789-abc.apps.googleusercontent.com
+                          </Typography>
+                          <Typography variant="body2" sx={{ mt: 1 }}>
+                            Save <code>.env</code>, stop the dev server (Ctrl+C), run <code>npm start</code>{" "}
+                            again. Full-page redirect sign-in is <strong>disabled</strong> here (it caused
+                            &quot;Unable to exchange external code&quot;).
+                          </Typography>
+                        </Alert>
+                      </Grow>
+                    )}
+
                     {/* Error alert */}
                     {(error || authError) && (
                       <Grow in timeout={200}>
@@ -400,7 +453,10 @@ const Login = () => {
                           sx={{ 
                             mb: 4, 
                             borderRadius: 3,
-                            "& .MuiAlert-icon": { fontSize: 24 }
+                            maxHeight: 520,
+                            overflow: "auto",
+                            "& .MuiAlert-message": { width: "100%", whiteSpace: "pre-wrap", wordBreak: "break-word" },
+                            "& .MuiAlert-icon": { fontSize: 24, alignSelf: "flex-start" }
                           }}
                         >
                           {error || authError}
@@ -408,41 +464,54 @@ const Login = () => {
                       </Grow>
                     )}
 
-                    {/* Google OAuth Sign-In Button */}
+                    {/* Google: ID token only (no redirect — avoids broken Supabase code exchange). */}
                     <Grow in timeout={2000}>
-                      <Button
-                        variant="outlined"
-                        startIcon={<Google />}
-                        fullWidth
-                        onClick={handleGoogleSignIn}
-                        size="large"
+                      <Box
                         sx={{
-                          py: 2.5,
-                          px: 4,
-                          borderRadius: 3,
-                          borderColor: "#e2e8f0",
-                          color: "#374151",
-                          backgroundColor: "white",
-                          textTransform: "none",
-                          fontSize: "1.1rem",
-                          fontWeight: 600,
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                          borderWidth: "2px",
-                          letterSpacing: "0.02em",
-                          transition: "all 0.3s ease",
-                          "&:hover": {
-                            backgroundColor: "#f8fafc",
-                            borderColor: "#cbd5e1",
-                            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
-                            transform: "translateY(-2px) scale(1.02)",
-                          },
-                          "&:active": {
-                            transform: "translateY(0) scale(0.98)",
-                          },
+                          width: "100%",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: 2,
                         }}
                       >
-                        Sign in with Google
-                      </Button>
+                        {googleWebClientId ? (
+                          <Box
+                            sx={{
+                              width: "100%",
+                              display: "flex",
+                              justifyContent: "center",
+                              opacity: oauthStarting ? 0.65 : 1,
+                              pointerEvents: oauthStarting ? "none" : "auto",
+                              "& iframe": { width: "100% !important", maxWidth: 400 },
+                            }}
+                          >
+                            <GoogleLogin
+                              onSuccess={(c) => void handleGoogleCredential(c)}
+                              onError={() =>
+                                setError("Google sign-in was cancelled or could not start.")
+                              }
+                              useOneTap={false}
+                              theme="outline"
+                              size="large"
+                              text="signin_with"
+                              shape="rectangular"
+                              width={360}
+                            />
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            align="center"
+                            sx={{ px: 1 }}
+                          >
+                            No button yet: paste your Web Client ID after the <code>=</code> in{" "}
+                            <code>.env</code>, then restart <code>npm start</code> (Create React App only reads{" "}
+                            <code>.env</code> when the server starts).
+                          </Typography>
+                        )}
+                      </Box>
                     </Grow>
 
                     {/* Additional info text */}

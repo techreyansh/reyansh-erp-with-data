@@ -154,9 +154,8 @@ const FollowupQuotations = ({ onComplete }) => {
       setUploadedFiles({});
       setQuotations([]);
       setSuccess(null);
-      // Fetch all indents at step 3 again so the saved indent is removed
-      const updatedIndents = await purchaseFlowService.getIndentsAtStep3();
-      setIndents(updatedIndents);
+      const updatedIndents = await purchaseFlowService.getIndentsAtStep4WithItemsAndVendors();
+      setIndents(Array.isArray(updatedIndents) ? updatedIndents : []);
     } catch (err) {
       console.error('Error saving:', err);
       setError(err.message || String(err));
@@ -252,20 +251,6 @@ const FollowupQuotations = ({ onComplete }) => {
         return 'default';
     }
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await purchaseFlowService.getIndentsAtStep3();
-        setIndents(data || []);
-      } catch (err) {
-        console.error('Error fetching indents:', err);
-        setError(err.message || 'Failed to fetch indents');
-        setIndents([]);
-      }
-    };
-    fetchData();
-  }, []);
 
   const handleSelectIndent = async (indent) => {
     setSelectedIndent(indent);

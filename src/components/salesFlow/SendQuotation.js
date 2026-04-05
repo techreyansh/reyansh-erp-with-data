@@ -555,9 +555,10 @@ const SendQuotation = () => {
       setSelectedLead(null);
     } catch (error) {
       console.error('Error submitting quotation:', error);
+      const detail = error?.message || error?.details || String(error);
       setSnackbar({
         open: true,
-        message: 'Failed to submit quotation',
+        message: detail ? `Failed to submit quotation: ${detail}` : 'Failed to submit quotation',
         severity: 'error'
       });
     } finally {

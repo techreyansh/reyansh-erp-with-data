@@ -1,7 +1,22 @@
 import * as db from '../lib/db';
 import config from '../config/config';
+import { parseJsonArray } from '../utils/parseJsonField';
+import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
 
-const CLIENTS_TABLE = db.getTableName(config.sheets.clients) || 'clients';
+/** Logical key from config → resolved via db.TABLE_NAMES / getTableName (must match public.clients2). */
+const CLIENTS_LOGICAL = config.sheets.clients;
+const CLIENTS_TABLE = db.getTableName(CLIENTS_LOGICAL) || 'clients2';
+
+console.log('[clientService] clients table resolution', {
+  'config.sheets.clients': CLIENTS_LOGICAL,
+});
+console.log('FINAL TABLE NAME:', CLIENTS_TABLE);
+
+if (CLIENTS_TABLE !== 'clients2') {
+  console.error(
+    '[clientService] Expected physical table "clients2" (public.clients2). Adjust db.TABLE_NAMES CLIENT/clients if your table name differs.'
+  );
+}
 
 // Generate unique client code sequentially (C + 5 digits, e.g., C00001)
 export async function generateSequentialClientCode() {
@@ -39,48 +54,62 @@ export async function checkClientCodeExists(clientCode) {
 }
 
 export async function getAllClients(forceRefresh = false) {
-  const data = await db.getTableRows(CLIENTS_TABLE);
-  // data is array of objects with keys from header
-  return data.map(row => ({
-    // Basic Information
-    clientName: row.ClientName || '',
-    clientCode: row.ClientCode || '',
-    businessType: row.BusinessType || '',
-    
-    // Contact Information
-    address: row.Address || '',
-    city: row.City || '',
-    state: row.State || '',
-    stateCode: row.StateCode || '',
-    pincode: row.Pincode || '',
-    country: row.Country || 'India',
-    
-    // Business Details
-    gstin: row.GSTIN || '',
-    panNumber: row.PANNumber || '',
-    accountCode: row.AccountCode || '',
-    website: row.Website || '',
-    
-    // Contact Management
-    contacts: row.Contacts ? JSON.parse(row.Contacts) : [],
-    
-    // Business Terms
-    paymentTerms: row.PaymentTerms || '',
-    creditLimit: row.CreditLimit || '',
-    creditPeriod: row.CreditPeriod || '',
-    deliveryTerms: row.DeliveryTerms || '',
-    
-    // Product Information
-    products: row.Products ? JSON.parse(row.Products) : [],
-    
-    // Additional Information
-    notes: row.Notes || '',
-    status: row.Status || 'Active',
-    rating: parseInt(row.Rating) || 0,
-    lastContactDate: row.LastContactDate || '',
-    totalOrders: parseInt(row.TotalOrders) || 0,
-    totalValue: parseFloat(row.TotalValue) || 0
-  }));
+  try {
+    console.log("[getAllClients] START", { forceRefresh, table: CLIENTS_TABLE });
+
+    const data = await db.getTableRows(CLIENTS_TABLE);
+
+    console.log("[getAllClients] RAW DATA:", data);
+
+    const rows = Array.isArray(data) ? data : [];
+    const mapped = rows.map((row) => ({
+      ...row,
+      // Basic Information
+      clientName: row.ClientName || '',
+      clientCode: row.ClientCode || '',
+      businessType: row.BusinessType || '',
+
+      // Contact Information
+      address: row.Address || '',
+      city: row.City || '',
+      state: row.State || '',
+      stateCode: row.StateCode || '',
+      pincode: row.Pincode || '',
+      country: row.Country || 'India',
+
+      // Business Details
+      gstin: row.GSTIN || '',
+      panNumber: row.PANNumber || '',
+      accountCode: row.AccountCode || '',
+      website: row.Website || '',
+
+      // Contact Management
+      contacts: parseJsonArray(row.Contacts),
+
+      // Business Terms
+      paymentTerms: row.PaymentTerms || '',
+      creditLimit: row.CreditLimit || '',
+      creditPeriod: row.CreditPeriod || '',
+      deliveryTerms: row.DeliveryTerms || '',
+
+      // Product Information
+      products: parseJsonArray(row.Products),
+
+      // Additional Information
+      notes: row.Notes || '',
+      status: row.Status || 'Active',
+      rating: parseInt(row.Rating, 10) || 0,
+      lastContactDate: row.LastContactDate || '',
+      totalOrders: parseInt(row.TotalOrders, 10) || 0,
+      totalValue: parseFloat(row.TotalValue) || 0,
+    }));
+
+    console.log("[getAllClients] SUCCESS", { count: mapped.length });
+    return mapped;
+  } catch (error) {
+    console.error("[getAllClients] ERROR:", error);
+    throw error;
+  }
 }
 
 export async function addClient(client) {
@@ -114,8 +143,8 @@ export async function addClient(client) {
     
     // Business Terms
     PaymentTerms: client.paymentTerms || '',
-    CreditLimit: client.creditLimit || '',
-    CreditPeriod: client.creditPeriod || '',
+    CreditLimit: sheetFloat(client.creditLimit, 0),
+    CreditPeriod: sheetInt(client.creditPeriod, 0),
     DeliveryTerms: client.deliveryTerms || '',
     
     // Product Information
@@ -124,10 +153,10 @@ export async function addClient(client) {
     // Additional Information
     Notes: client.notes || '',
     Status: client.status || 'Active',
-    Rating: client.rating || 0,
+    Rating: sheetInt(client.rating, 0),
     LastContactDate: client.lastContactDate || '',
-    TotalOrders: client.totalOrders || 0,
-    TotalValue: client.totalValue || 0
+    TotalOrders: sheetInt(client.totalOrders, 0),
+    TotalValue: sheetFloat(client.totalValue, 0)
   };
   await db.insertTableRow(CLIENTS_TABLE, row);
 }
@@ -169,8 +198,8 @@ export async function updateClient(client, originalClientCode = null) {
     
     // Business Terms
     PaymentTerms: client.paymentTerms || '',
-    CreditLimit: client.creditLimit || '',
-    CreditPeriod: client.creditPeriod || '',
+    CreditLimit: sheetFloat(client.creditLimit, 0),
+    CreditPeriod: sheetInt(client.creditPeriod, 0),
     DeliveryTerms: client.deliveryTerms || '',
     
     // Product Information
@@ -179,10 +208,10 @@ export async function updateClient(client, originalClientCode = null) {
     // Additional Information
     Notes: client.notes || '',
     Status: client.status || 'Active',
-    Rating: client.rating || 0,
+    Rating: sheetInt(client.rating, 0),
     LastContactDate: client.lastContactDate || '',
-    TotalOrders: client.totalOrders || 0,
-    TotalValue: client.totalValue || 0
+    TotalOrders: sheetInt(client.totalOrders, 0),
+    TotalValue: sheetFloat(client.totalValue, 0)
   };
   await db.updateTableRowById(CLIENTS_TABLE, existing.id, row);
 }

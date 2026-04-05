@@ -368,16 +368,22 @@ const LogAndQualifyLeads = () => {
       // Generate new enquiry number
       generateEnquiryNumber();
 
-      // Navigate back to sales flow after a short delay
+      // Continue to step 2 (Initial Call) after a short delay
       setTimeout(() => {
-        navigate('/sales-flow');
-      }, 2000);
+        navigate('/sales-flow/initial-call');
+      }, 1200);
 
     } catch (error) {
       console.error('Error creating lead:', error);
+      const detail =
+        error?.message ||
+        error?.details ||
+        (typeof error === 'string' ? error : '');
       setSnackbar({
         open: true,
-        message: 'Failed to create lead. Please try again.',
+        message: detail
+          ? `Failed to create lead: ${detail}`
+          : 'Failed to create lead. Please try again.',
         severity: 'error'
       });
     } finally {

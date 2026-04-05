@@ -175,9 +175,13 @@ const StandardsAndCompliance = () => {
 
     } catch (error) {
       console.error('Error saving compliance check:', error);
+      const detail =
+        error?.message || error?.details || (typeof error === 'string' ? error : '');
       setSnackbar({
         open: true,
-        message: 'Failed to save compliance check. Please try again.',
+        message: detail
+          ? `Failed to save compliance check: ${detail}`
+          : 'Failed to save compliance check. Please try again.',
         severity: 'error'
       });
     } finally {

@@ -10,6 +10,9 @@ function table(name) {
 
 async function getSheetData(sheetName) {
   if (!sheetName) throw new Error('Table name is required');
+  if (sheetName === 'SendQuotation') {
+    return db.getSendQuotationRows();
+  }
   return db.getTableRows(table(sheetName));
 }
 
