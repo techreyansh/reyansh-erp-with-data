@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AppBar,
@@ -59,17 +59,25 @@ import {
   Help as HelpIcon,
   ContactMail as CRMIcon,
   Security as SecurityIcon,
+  TrendingUp,
+  Analytics,
+  DarkModeOutlined,
+  HomeOutlined,
+  LightModeOutlined,
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
+import { useThemeMode } from "../../context/ThemeModeContext";
 import config from "../../config/config";
 import HeaderTasks from "./HeaderTasks";
 
 const Header = () => {
   const theme = useTheme();
+  const { mode, toggleMode } = useThemeMode();
   const { user, signOut, role: userRole } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const isMobile = useMediaQuery("(max-width:1024px)");
+  const isCompactNav = useMediaQuery(theme.breakpoints.down("lg"));
+  const subtleHoverBg = theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.12)" : theme.palette.grey[100];
 
   const [anchorEl, setAnchorEl] = useState({});
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -130,7 +138,43 @@ const Header = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const isCEO = (userRole || '').toUpperCase() === 'CEO';
+  const isCEO =
+    (userRole || "").toUpperCase() === "CEO" ||
+    (user?.roleCode || "").toUpperCase() === "CEO" ||
+    (user?.roleCode || "").toUpperCase() === "SUPER_ADMIN";
+
+  /** Roles that can open CRM / PPC module menus (aligns with operational teams). */
+  const crmModuleRoles = [
+    "CEO",
+    "Customer Relations Manager",
+    "Sales Executive",
+    "Director",
+    "NPD",
+    "Store Manager",
+    "Process Coordinator",
+    "Production Manager",
+    "QC Manager",
+    "Quality Engineer",
+    "Cable Production Supervisor",
+    "Moulding Production Supervisor",
+    "Management / HOD",
+    "Accounts Executive",
+  ];
+
+  const ppcModuleRoles = [
+    "CEO",
+    "Production Manager",
+    "Store Manager",
+    "Process Coordinator",
+    "Customer Relations Manager",
+    "QC Manager",
+    "Quality Engineer",
+    "Cable Production Supervisor",
+    "Moulding Production Supervisor",
+    "Management / HOD",
+    "Purchase Executive",
+    "Sales Executive",
+  ];
 
   /**
    * ROLE-BASED ACCESS CONTROL CONFIGURATION
@@ -158,6 +202,12 @@ const Header = () => {
       label: "Dashboard",
       icon: <Dashboard />,
       items: [
+        {
+          label: "Home",
+          path: "/home",
+          icon: <HomeOutlined />,
+          roles: ["all"],
+        },
         {
           label: "CEO Master Control",
           path: "/ceo-command",
@@ -256,11 +306,58 @@ const Header = () => {
           roles: ["CEO"],
         },
         {
-          label: "CRM Management",
-          path: "/crm",
-          icon: <CRMIcon />,
-          roles: ["CEO", "Customer Relations Manager", "Sales Executive"],
+          label: "Task Checklist",
+          path: "/task-checklist",
+          icon: <Assignment />,
+          roles: ["all"],
         },
+        {
+          label: "Task Compliance Admin",
+          path: "/task-compliance-admin",
+          icon: <TableChart />,
+          roles: ["CEO", "HR Manager", "Management / HOD", "Process Coordinator"],
+        },
+      ],
+    },
+    {
+      key: "crm",
+      label: "CRM",
+      icon: <CRMIcon />,
+      items: [
+        { label: "Leads", path: "/crm/leads", icon: <ListAlt />, roles: crmModuleRoles },
+        { label: "Customers", path: "/crm/customers", icon: <PeopleIcon />, roles: crmModuleRoles },
+        { label: "Follow-ups", path: "/crm/follow-ups", icon: <Assignment />, roles: crmModuleRoles },
+        { label: "Deals", path: "/crm/deals", icon: <TrendingUp />, roles: crmModuleRoles },
+        { label: "Lead Scoring", path: "/crm/lead-scoring", icon: <Analytics />, roles: crmModuleRoles },
+        { label: "Activity Timeline", path: "/crm/timeline", icon: <Assignment />, roles: crmModuleRoles },
+        { label: "Quotations", path: "/crm/quotations", icon: <TableChart />, roles: crmModuleRoles },
+        { label: "Sales Orders", path: "/crm/sales-orders", icon: <ListAlt />, roles: crmModuleRoles },
+        { label: "Customer 360", path: "/crm/customer-360", icon: <Dashboard />, roles: crmModuleRoles },
+        { label: "Documents", path: "/crm/documents", icon: <Storage />, roles: crmModuleRoles },
+        { label: "Sales Performance", path: "/crm/performance", icon: <TrendingUp />, roles: crmModuleRoles },
+      ],
+    },
+    {
+      key: "ppc",
+      label: "PPC",
+      icon: <ProductionIcon />,
+      items: [
+        { label: "Production Plan", path: "/ppc/production-plan", icon: <Assignment />, roles: ppcModuleRoles },
+        { label: "Work Orders", path: "/ppc/work-orders", icon: <ListAlt />, roles: ppcModuleRoles },
+        { label: "Inventory", path: "/ppc/inventory", icon: <InventoryIcon />, roles: ppcModuleRoles },
+        { label: "Dispatch", path: "/ppc/dispatch", icon: <LocalShipping />, roles: ppcModuleRoles },
+        { label: "Reports", path: "/ppc/reports", icon: <Dashboard />, roles: ppcModuleRoles },
+        { label: "BOM", path: "/ppc/bom", icon: <TableChart />, roles: ppcModuleRoles },
+        { label: "MRP", path: "/ppc/mrp", icon: <Analytics />, roles: ppcModuleRoles },
+        { label: "Capacity", path: "/ppc/capacity", icon: <Dashboard />, roles: ppcModuleRoles },
+        { label: "Routing", path: "/ppc/routing", icon: <Assignment />, roles: ppcModuleRoles },
+        { label: "Production Tracking", path: "/ppc/tracking", icon: <TrendingUp />, roles: ppcModuleRoles },
+        { label: "Quality Control", path: "/ppc/qc", icon: <SecurityIcon />, roles: ppcModuleRoles },
+        { label: "Scrap Tracking", path: "/ppc/scrap", icon: <DebugIcon />, roles: ppcModuleRoles },
+        { label: "Maintenance", path: "/ppc/maintenance", icon: <Settings />, roles: ppcModuleRoles },
+        { label: "Dispatch Intelligence", path: "/ppc/dispatch-intelligence", icon: <LocalShipping />, roles: ppcModuleRoles },
+        { label: "Production Costing", path: "/ppc/costing", icon: <CostingIcon />, roles: ppcModuleRoles },
+        { label: "Integrated Dashboard", path: "/ppc/advanced-dashboard", icon: <Dashboard />, roles: ppcModuleRoles },
       ],
     },
     {
@@ -386,16 +483,20 @@ const Header = () => {
    *    - Item has roles: ["all"] (universal access)
    * 3. Empty menu groups are removed from display
    */
+  const userAccessRoles = [userRole, user?.roleCode].filter(Boolean);
+
   const filteredMenuGroups = user
-    ? menuGroups.map(group => ({
-        ...group,
-        items: group.items.filter(item => 
-          // CEO gets access to everything - no restrictions
-          isCEO || 
-          item.roles.includes(userRole) || 
-          item.roles.includes("all")
-        )
-      })).filter(group => group.items.length > 0)
+    ? menuGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter(
+            (item) =>
+              isCEO ||
+              item.roles.includes("all") ||
+              userAccessRoles.some((r) => item.roles.includes(r))
+          ),
+        }))
+        .filter((group) => group.items.length > 0)
     : [];
 
   // For CEO, show ALL menu groups and ALL items without filtering
@@ -469,7 +570,7 @@ const Header = () => {
       >
         <Toolbar sx={{ px: { xs: 2, md: 3 }, py: 1, minHeight: 64 }}>
           {/* Mobile Menu Button */}
-          {isMobile && (
+          {isCompactNav && (
             <IconButton
               edge="start"
               color="primary"
@@ -528,7 +629,7 @@ const Header = () => {
           </Box>
 
           {/* Desktop Navigation */}
-          {!isMobile && user && (
+          {!isCompactNav && user && (
             <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1, justifyContent: "center" }}>
               {finalMenuGroups.map((group) => (
                 <Box key={group.key} sx={{ position: "relative" }}>
@@ -626,7 +727,7 @@ const Header = () => {
                 sx={{ 
                   color: theme.palette.text.secondary,
                   "&:hover": { 
-                    backgroundColor: theme.palette.grey[100],
+                    backgroundColor: subtleHoverBg,
                     color: theme.palette.text.primary
                   }
                 }}
@@ -644,7 +745,7 @@ const Header = () => {
                 sx={{ 
                   color: theme.palette.text.secondary,
                   "&:hover": { 
-                    backgroundColor: theme.palette.grey[100],
+                    backgroundColor: subtleHoverBg,
                     color: theme.palette.text.primary
                   }
                 }}
@@ -655,6 +756,26 @@ const Header = () => {
 
             {/* Task Notifications */}
             {user && <HeaderTasks />}
+
+            {user && (
+              <Tooltip title={`Switch to ${mode === "dark" ? "light" : "dark"} mode`} placement="bottom">
+                <IconButton
+                  color="inherit"
+                  size="small"
+                  onClick={toggleMode}
+                  aria-label={`Switch to ${mode === "dark" ? "light" : "dark"} mode`}
+                  sx={{
+                    color: theme.palette.text.secondary,
+                    "&:hover": {
+                      backgroundColor: subtleHoverBg,
+                      color: theme.palette.text.primary,
+                    },
+                  }}
+                >
+                  {mode === "dark" ? <LightModeOutlined sx={{ fontSize: 20 }} /> : <DarkModeOutlined sx={{ fontSize: 20 }} />}
+                </IconButton>
+              </Tooltip>
+            )}
 
             {/* User Profile */}
             {user ? (
@@ -760,6 +881,19 @@ const Header = () => {
                       primary={isCEO || userRole === 'HR Manager' ? 'Employee Dashboard' : 'My Dashboard'} 
                     />
                   </MenuItem>
+
+                  <MenuItem
+                    onClick={() => {
+                      handleProfileMenuClose();
+                      navigate('/task-checklist');
+                    }}
+                    sx={{ py: 1.5 }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      <Assignment sx={{ fontSize: 20 }} />
+                    </ListItemIcon>
+                    <ListItemText primary="My Tasks" />
+                  </MenuItem>
                   
                   <MenuItem 
                     onClick={() => {
@@ -808,7 +942,7 @@ const Header = () => {
       </AppBar>
 
       {/* Mobile Drawer */}
-      {isMobile && (
+      {isCompactNav && (
         <Drawer
           anchor="left"
           open={drawerOpen}
@@ -1089,7 +1223,7 @@ const Header = () => {
                 {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Press <Chip label="↵" size="small" sx={{ height: 18, fontSize: "0.7rem", mx: 0.5 }} /> to navigate
+                Press <Chip label="Enter" size="small" sx={{ height: 18, fontSize: "0.7rem", mx: 0.5 }} /> to navigate
               </Typography>
             </Box>
           )}

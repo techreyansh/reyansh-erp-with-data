@@ -22,7 +22,7 @@ const RootRedirect = () => {
     (async () => {
       const hasSession = await syncUserFromSupabase();
       if (cancelled) return;
-      navigate(hasSession ? '/dashboard' : '/login', { replace: true });
+      navigate(hasSession ? '/home' : '/login', { replace: true });
     })();
 
     return () => {

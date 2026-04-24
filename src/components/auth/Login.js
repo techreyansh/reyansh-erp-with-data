@@ -60,7 +60,7 @@ const Login = () => {
       const hasSession = await syncUserFromSupabase();
       if (cancelled) return;
       if (hasSession) {
-        navigate("/dashboard", { replace: true });
+        navigate("/home", { replace: true });
       }
     })();
     return () => {
@@ -91,7 +91,7 @@ const Login = () => {
         return;
       }
       await syncUserFromSupabase();
-      navigate("/dashboard", { replace: true });
+      navigate("/home", { replace: true });
     } catch (e) {
       console.error("Google ID sign-in exception:", e);
       setError("Google sign-in failed unexpectedly.");

@@ -28,6 +28,21 @@ export const AuthProvider = ({ children }) => {
   const enrichRole = useCallback(async (userId) => {
     if (!userId) return;
     try {
+      const { data: superAdmin, error: rpcErr } = await supabase.rpc('is_super_admin');
+      if (!rpcErr && superAdmin === true) {
+        setUser((prev) =>
+          prev && prev.id === userId
+            ? { ...prev, role: 'CEO', roleCode: 'CEO' }
+            : prev
+        );
+        setError(null);
+        return;
+      }
+    } catch (e) {
+      console.warn('is_super_admin RPC unavailable or migration not applied:', e);
+    }
+
+    try {
       const { data, error: dbError } = await supabase
         .from('users')
         .select(

@@ -65,7 +65,8 @@ import {
   Work as WorkIcon,
   LocationOn as LocationIcon,
   Email as EmailIcon,
-  Phone as PhoneIcon
+  Phone as PhoneIcon,
+  AdminPanelSettings as AdminPanelIcon
 } from '@mui/icons-material';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorMessage from '../common/ErrorMessage';
@@ -80,6 +81,8 @@ import PerformanceTab from './PerformanceTab';
 import EnhancedAttendanceTab from './EnhancedAttendanceTab';
 import NotificationsTab from './NotificationsTab';
 import { useAuth } from '../../context/AuthContext';
+import { checkIsSuperAdmin } from '../../services/adminAccessService';
+import AdminAccessControlSection from './AdminAccessControlSection';
 
 // Animation components (using regular MUI components for now)
 const MotionBox = Box;
@@ -109,7 +112,27 @@ function TabPanel({ children, value, index, ...other }) {
 const AdvancedEmployeeDashboard = () => {
   const theme = useTheme();
   const { user } = useAuth();
-  const isCEO = (user?.role || '').toUpperCase() === 'CEO' || (user?.role || '').toUpperCase() === 'DIRECTOR';
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const ok = await checkIsSuperAdmin();
+        if (!cancelled) setIsSuperAdmin(!!ok);
+      } catch {
+        if (!cancelled) setIsSuperAdmin(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const isCEO =
+    (user?.role || '').toUpperCase() === 'CEO' ||
+    (user?.role || '').toUpperCase() === 'DIRECTOR' ||
+    isSuperAdmin;
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -913,6 +936,9 @@ const AdvancedEmployeeDashboard = () => {
                   label="Notifications"
                   sx={{ gap: 1 }}
                 />
+                {isSuperAdmin && (
+                  <Tab icon={<AdminPanelIcon />} label="Admin Access" sx={{ gap: 1 }} />
+                )}
               </Tabs>
             </Card>
 
@@ -975,6 +1001,11 @@ const AdvancedEmployeeDashboard = () => {
                     onNotificationRead={() => loadEmployeeData(selectedEmployee)}
                   />
                 </TabPanel>
+                {isSuperAdmin && (
+                  <TabPanel value={activeTab} index={6}>
+                    <AdminAccessControlSection userEmail={user?.email} />
+                  </TabPanel>
+                )}
               </>
             )}
           </Box>
