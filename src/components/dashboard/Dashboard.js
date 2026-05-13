@@ -79,7 +79,7 @@ function normalizeClientRow(row) {
 
 /**
  * Executive dashboard — `getAllClients()` runs on every mount (each navigation to Dashboard).
- * Triggers Supabase `GET /rest/v1/clients2` via `db.getTableRows` inside `clientService`.
+ * Triggers Supabase client table reads via `db.getTableRows` inside `clientService`.
  */
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -181,7 +181,7 @@ const Dashboard = () => {
                 Executive Dashboard
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                Clients overview — getAllClients on each Dashboard load (see Network → /rest/v1/clients2)
+                Clients overview — getAllClients on each Dashboard load
               </Typography>
             </Box>
           </Box>

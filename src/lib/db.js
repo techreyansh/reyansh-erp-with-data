@@ -10,9 +10,9 @@ export const TABLE_NAMES = {
   Users: 'users',
   users: 'users',
 
-  // Clients — physical table in Supabase (public.clients2)
-  CLIENT: 'clients2',
-  clients: 'clients2',
+  // Clients — canonical migration table is public.clients; legacy projects may still use clients2.
+  CLIENT: 'clients',
+  clients: 'clients',
   PROSPECTS_CLIENTS: 'prospects_clients',
   prospects_clients: 'prospects_clients',
   Client_Orders: 'client_orders_data',
@@ -25,14 +25,14 @@ export const TABLE_NAMES = {
   client_notifications: 'client_notifications_data',
 
   // Vendors & stock
-  Vendor: 'vendors_data',
-  vendors: 'vendors_data',
-  Stock: 'stock_data',
-  stock: 'stock_data',
-  'Material Inward': 'material_inward_data',
-  'Material Issue': 'material_issue_data',
-  BOM: 'company_bom_data',
-  'Kitting Sheet': 'company_material_issue_data',
+  Vendor: 'vendors',
+  vendors: 'vendors',
+  Stock: 'stock',
+  stock: 'stock',
+  'Material Inward': 'material_inward',
+  'Material Issue': 'material_issue',
+  BOM: 'bom',
+  'Kitting Sheet': 'kitting_sheet',
   'Finished Goods': 'finished_goods',
 
   // Dispatches
@@ -40,38 +40,38 @@ export const TABLE_NAMES = {
   dispatches: 'dispatches',
 
   // Purchase flow
-  Purchase_Flow: 'purchase_flow_data',
-  PurchaseFlow: 'purchase_flow_data',
-  purchase_flows: 'purchase_flow_data',
-  PurchaseFlowSteps: 'purchase_flow_steps_data',
-  purchase_flow_steps: 'purchase_flow_steps_data',
+  Purchase_Flow: 'purchase_flows',
+  PurchaseFlow: 'purchase_flows',
+  purchase_flows: 'purchase_flows',
+  PurchaseFlowSteps: 'purchase_flow_steps',
+  purchase_flow_steps: 'purchase_flow_steps',
 
   // Sales flow
-  SalesFlow: 'sales_flow_data',
-  sales_flows: 'sales_flow_data',
-  SalesFlowSteps: 'sales_flow_steps_data',
-  sales_flow_steps: 'sales_flow_steps_data',
-  LogAndQualifyLeads: 'log_and_qualify_leads_data',
-  InitialCall: 'initial_call_data',
+  SalesFlow: 'sales_flows',
+  sales_flows: 'sales_flows',
+  SalesFlowSteps: 'sales_flow_steps',
+  sales_flow_steps: 'sales_flow_steps',
+  LogAndQualifyLeads: 'log_and_qualify_leads',
+  InitialCall: 'initial_call',
   // Migration 20250223100000: public.send_quotation (legacy deploys may use send_quotation_data)
   SendQuotation: 'send_quotation',
-  ApprovePaymentTerms: 'approve_payment_terms_data',
-  SampleSubmission: 'sample_submission_data',
-  GetApprovalForSample: 'get_approval_for_sample_data',
-  ApproveStrategicDeals: 'approve_strategic_deals_data',
-  EvaluateHighValueProspects: 'evaluate_high_value_prospects_data',
-  CheckFeasibility: 'check_feasibility_data',
+  ApprovePaymentTerms: 'approve_payment_terms',
+  SampleSubmission: 'sample_submission',
+  GetApprovalForSample: 'get_approval_for_sample',
+  ApproveStrategicDeals: 'approve_strategic_deals',
+  EvaluateHighValueProspects: 'evaluate_high_value_prospects',
+  CheckFeasibility: 'check_feasibility',
   // Matches supabase/migrations/20250223100000_replace_sheet_rows_with_entity_tables.sql (not *_data).
   ConfirmStandardAndCompliance: 'confirm_standard_and_compliance',
-  FollowUpQuotations: 'follow_up_quotations_data',
-  'Comparative Statement': 'comparative_statement_data',
-  SheetApproveQuotation: 'sheet_approve_quotation_data',
-  RequestSample: 'request_sample_data',
-  InspectMaterial: 'inspect_material_data',
+  FollowUpQuotations: 'follow_up_quotations',
+  'Comparative Statement': 'comparative_statement',
+  SheetApproveQuotation: 'sheet_approve_quotation',
+  RequestSample: 'request_sample',
+  InspectMaterial: 'inspect_material',
   MaterialApproval: 'material_approval',
-  PlacePO: 'place_po_data',
-  ReturnHistory: 'return_history_data',
-  GenerateGRN: 'generate_grn_data',
+  PlacePO: 'place_po',
+  ReturnHistory: 'return_history',
+  GenerateGRN: 'generate_grn',
   SchedulePayment: 'schedule_payment',
   ReleasePayment: 'release_payment',
 
@@ -92,18 +92,18 @@ export const TABLE_NAMES = {
   cable_production_plans: 'cable_production_plans',
   'Machine Schedules': 'machine_schedules',
   machine_schedules: 'machine_schedules',
-  RFQ: 'rfq_data',
-  rfq: 'rfq_data',
+  RFQ: 'rfq',
+  rfq: 'rfq',
   BOM_Templates: 'bom_templates',
   bom_templates: 'bom_templates',
-  SortVendor: 'sort_vendor_data',
-  sort_vendor: 'sort_vendor_data',
-  FollowUpDelivery: 'follow_up_delivery_data',
-  follow_up_delivery: 'follow_up_delivery_data',
-  ReturnMaterial: 'return_material_data',
-  return_material: 'return_material_data',
-  InspectSample: 'inspect_sample_data',
-  inspect_sample: 'inspect_sample_data',
+  SortVendor: 'sort_vendor',
+  sort_vendor: 'sort_vendor',
+  FollowUpDelivery: 'follow_up_delivery',
+  follow_up_delivery: 'follow_up_delivery',
+  ReturnMaterial: 'return_material',
+  return_material: 'return_material',
+  InspectSample: 'inspect_sample',
+  inspect_sample: 'inspect_sample',
 
   // HR / admin custom data tables
   Employees: 'employees_data',
@@ -118,10 +118,74 @@ export const TABLE_NAMES = {
   notifications: 'notifications_data',
 };
 
+const TABLE_ALIASES = {
+  clients: ['clients2'],
+  vendors: ['vendors_data'],
+  stock: ['stock_data'],
+  material_inward: ['material_inward_data'],
+  material_issue: ['material_issue_data'],
+  bom: ['company_bom_data', 'bill_of_materials_data'],
+  kitting_sheet: ['company_material_issue_data'],
+  purchase_flows: ['purchase_flow_data'],
+  purchase_flow_steps: ['purchase_flow_steps_data'],
+  sales_flows: ['sales_flow_data'],
+  sales_flow_steps: ['sales_flow_steps_data'],
+  log_and_qualify_leads: ['log_and_qualify_leads_data'],
+  initial_call: ['initial_call_data'],
+  send_quotation: ['send_quotation_data'],
+  approve_payment_terms: ['approve_payment_terms_data'],
+  sample_submission: ['sample_submission_data'],
+  get_approval_for_sample: ['get_approval_for_sample_data'],
+  approve_strategic_deals: ['approve_strategic_deals_data'],
+  evaluate_high_value_prospects: ['evaluate_high_value_prospects_data'],
+  check_feasibility: ['check_feasibility_data'],
+  confirm_standard_and_compliance: ['confirm_standard_and_compliance_data'],
+  follow_up_quotations: ['follow_up_quotations_data'],
+  comparative_statement: ['comparative_statement_data'],
+  sheet_approve_quotation: ['sheet_approve_quotation_data'],
+  request_sample: ['request_sample_data'],
+  inspect_material: ['inspect_material_data'],
+  place_po: ['place_po_data'],
+  return_history: ['return_history_data'],
+  generate_grn: ['generate_grn_data'],
+  rfq: ['rfq_data'],
+  sort_vendor: ['sort_vendor_data'],
+  follow_up_delivery: ['follow_up_delivery_data'],
+  return_material: ['return_material_data'],
+  inspect_sample: ['inspect_sample_data'],
+};
+
+const tableNameCache = new Map();
+
+function uniq(values) {
+  return values.filter((value, index, array) => value && array.indexOf(value) === index);
+}
+
+export function getTableCandidateNames(tableName) {
+  const primary = getTableName(tableName);
+  const cached = tableNameCache.get(primary);
+  const aliases = TABLE_ALIASES[primary] || [];
+  const derived = [];
+
+  if (primary.endsWith('_data')) {
+    derived.push(primary.slice(0, -5));
+  } else {
+    derived.push(`${primary}_data`);
+  }
+
+  return uniq([cached, primary, ...aliases, ...derived]);
+}
+
+function rememberResolvedTableName(primary, resolvedName) {
+  if (primary && resolvedName && primary !== resolvedName) {
+    tableNameCache.set(primary, resolvedName);
+  }
+}
+
 /** True when table is not the wrapped shape (id, sort_order, record jsonb) — use select * / direct rows. */
 function isLegacyJsonSchemaError(error) {
   if (!error) return false;
-  // PostgREST/Postgres: column does not exist (e.g. flat "sheet" tables like clients2)
+  // PostgREST/Postgres: column does not exist (e.g. flat legacy tables)
   if (String(error.code || '') === '42703') return true;
   const msg = String(error?.message || '').toLowerCase();
   return (
@@ -206,43 +270,65 @@ export function getTableName(logicalName) {
 
 /**
  * Get all rows from a table as flattened objects { id, ...record }.
- * @param {string} tableName - actual table name (e.g. 'users', 'clients2')
+ * @param {string} tableName - logical or actual table name (e.g. 'Users', 'clients')
  * @returns {Promise<Array<{ id: string, ... }>>}
  */
 export async function getTableRows(tableName) {
-  const name = getTableName(tableName);
-  debugGetTableRows('invoke', { tableName, resolvedName: name, useLocalStorage: config.useLocalStorage });
+  const primaryName = getTableName(tableName);
+  const candidateNames = getTableCandidateNames(tableName);
+  debugGetTableRows('invoke', { tableName, resolvedName: primaryName, candidateNames, useLocalStorage: config.useLocalStorage });
   console.log('Using Supabase, not local storage');
 
-  const { data: rows, error } = await supabase
-    .from(name)
-    .select('id, created_at, sort_order, record')
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true });
+  let lastMissingTableError = null;
 
-  if (error) {
-    debugGetTableRows('primary select error', { resolvedName: name, error });
-    // Fallback for direct-column tables (no sort_order/record wrapper)
-    if (!isLegacyJsonSchemaError(error)) {
-      console.error(`Error getTableRows(${name}):`, error);
-      throw error;
+  for (const name of candidateNames) {
+    const { data: rows, error } = await supabase
+      .from(name)
+      .select('id, created_at, sort_order, record')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      debugGetTableRows('primary select error', { resolvedName: name, error });
+      if (isPostgrestMissingTableError(error)) {
+        lastMissingTableError = error;
+        continue;
+      }
+      // Fallback for direct-column tables (no sort_order/record wrapper)
+      if (!isLegacyJsonSchemaError(error)) {
+        console.error(`Error getTableRows(${name}):`, error);
+        throw error;
+      }
+      // Legacy flat tables may omit created_at/sort_order/record — select all columns, no order.
+      const { data: directRows, error: directErr } = await supabase.from(name).select('*');
+      if (directErr) {
+        if (isPostgrestMissingTableError(directErr)) {
+          lastMissingTableError = directErr;
+          continue;
+        }
+        console.error(`Error getTableRows(${name}) [direct]:`, directErr);
+        debugGetTableRows('fallback select error', { resolvedName: name, error: directErr });
+        throw directErr;
+      }
+      rememberResolvedTableName(primaryName, name);
+      debugGetTableRows('fallback success', { resolvedName: name, rowCount: (directRows || []).length });
+      return directRows || [];
     }
-    // Legacy flat tables may omit created_at/sort_order/record — select all columns, no order.
-    const { data: directRows, error: directErr } = await supabase.from(name).select('*');
-    if (directErr) {
-      console.error(`Error getTableRows(${name}) [direct]:`, directErr);
-      debugGetTableRows('fallback select error', { resolvedName: name, error: directErr });
-      throw directErr;
-    }
-    debugGetTableRows('fallback success', { resolvedName: name, rowCount: (directRows || []).length });
-    return directRows || [];
+
+    rememberResolvedTableName(primaryName, name);
+    debugGetTableRows('success', { resolvedName: name, rowCount: (rows || []).length });
+    return (rows || []).map((r) => ({
+      id: r.id,
+      ...(r.record || {}),
+    }));
   }
 
-  debugGetTableRows('success', { resolvedName: name, rowCount: (rows || []).length });
-  return (rows || []).map((r) => ({
-    id: r.id,
-    ...(r.record || {}),
-  }));
+  if (lastMissingTableError) {
+    console.warn(`No Supabase table found for ${primaryName}; returning an empty list.`, lastMissingTableError);
+    return [];
+  }
+
+  return [];
 }
 
 /**
@@ -252,46 +338,75 @@ export async function getTableRows(tableName) {
  * @returns {Promise<object>}
  */
 export async function insertTableRow(tableName, row) {
-  const name = getTableName(tableName);
+  const primaryName = getTableName(tableName);
   const safeRow =
     typeof row === 'object' && row !== null && !Array.isArray(row) ? { ...row } : {};
 
-  let nextOrder = 0;
-  const { data: maxRow, error: maxErr } = await supabase
-    .from(name)
-    .select('sort_order')
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let lastMissingTableError = null;
+  for (const name of getTableCandidateNames(tableName)) {
+    let nextOrder = 0;
+    const { data: maxRow, error: maxErr } = await supabase
+      .from(name)
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!maxErr && typeof maxRow?.sort_order === 'number') {
-    nextOrder = maxRow.sort_order + 1;
-  } else if (maxErr && !isLegacyJsonSchemaError(maxErr)) {
-    console.error(`Error insertTableRow(${name}) [max sort]:`, maxErr);
-    throw maxErr;
-  }
+    if (!maxErr && typeof maxRow?.sort_order === 'number') {
+      nextOrder = maxRow.sort_order + 1;
+    } else if (maxErr) {
+      if (isPostgrestMissingTableError(maxErr)) {
+        lastMissingTableError = maxErr;
+        continue;
+      }
+      if (!isLegacyJsonSchemaError(maxErr)) {
+        console.error(`Error insertTableRow(${name}) [max sort]:`, maxErr);
+        throw maxErr;
+      }
+    }
 
-  /** Prefer jsonb `record` (canonical sheet migration). Do not skip this when sort_order query failed. */
-  const wrappedAttempts = [
-    { sort_order: nextOrder, record: safeRow },
-    { record: safeRow },
-  ];
+    /** Prefer jsonb `record` (canonical sheet migration). Do not skip this when sort_order query failed. */
+    const wrappedAttempts = [
+      { sort_order: nextOrder, record: safeRow },
+      { record: safeRow },
+    ];
 
-  for (const payload of wrappedAttempts) {
-    const { error } = await supabase.from(name).insert(payload);
-    if (!error) return {};
-    if (!isLegacyJsonSchemaError(error)) {
+    let shouldTryDirect = false;
+    for (const payload of wrappedAttempts) {
+      const { error } = await supabase.from(name).insert(payload);
+      if (!error) {
+        rememberResolvedTableName(primaryName, name);
+        return {};
+      }
+      if (isPostgrestMissingTableError(error)) {
+        lastMissingTableError = error;
+        shouldTryDirect = false;
+        break;
+      }
+      if (isLegacyJsonSchemaError(error)) {
+        shouldTryDirect = true;
+        continue;
+      }
       console.error(`Error insertTableRow(${name}):`, error);
       throw error;
     }
-  }
 
-  const { error: directErr } = await supabase.from(name).insert(safeRow);
-  if (directErr) {
+    if (!shouldTryDirect) continue;
+
+    const { error: directErr } = await supabase.from(name).insert(safeRow);
+    if (!directErr) {
+      rememberResolvedTableName(primaryName, name);
+      return {};
+    }
+    if (isPostgrestMissingTableError(directErr)) {
+      lastMissingTableError = directErr;
+      continue;
+    }
     console.error(`Error insertTableRow(${name}) [direct]:`, directErr);
     throw directErr;
   }
-  return {};
+
+  throw lastMissingTableError || new Error(`No Supabase table found for ${primaryName}`);
 }
 
 /**
@@ -301,29 +416,47 @@ export async function insertTableRow(tableName, row) {
  * @param {object} row - full record to store
  */
 export async function updateTableRowById(tableName, id, row) {
-  const name = getTableName(tableName);
+  const primaryName = getTableName(tableName);
+  let lastMissingTableError = null;
 
-  const { error } = await supabase
-    .from(name)
-    .update({ record: row || {} })
-    .eq('id', id);
+  for (const name of getTableCandidateNames(tableName)) {
+    const { error } = await supabase
+      .from(name)
+      .update({ record: row || {} })
+      .eq('id', id);
 
-  if (!error) return;
-  if (!isLegacyJsonSchemaError(error)) {
-    console.error(`Error updateTableRowById(${name}, ${id}):`, error);
-    throw error;
-  }
+    if (!error) {
+      rememberResolvedTableName(primaryName, name);
+      return;
+    }
+    if (isPostgrestMissingTableError(error)) {
+      lastMissingTableError = error;
+      continue;
+    }
+    if (!isLegacyJsonSchemaError(error)) {
+      console.error(`Error updateTableRowById(${name}, ${id}):`, error);
+      throw error;
+    }
 
-  const directPayload = row && typeof row === 'object' ? row : {};
-  const { error: directErr } = await supabase
-    .from(name)
-    .update(directPayload)
-    .eq('id', id);
+    const directPayload = row && typeof row === 'object' ? row : {};
+    const { error: directErr } = await supabase
+      .from(name)
+      .update(directPayload)
+      .eq('id', id);
 
-  if (directErr) {
+    if (!directErr) {
+      rememberResolvedTableName(primaryName, name);
+      return;
+    }
+    if (isPostgrestMissingTableError(directErr)) {
+      lastMissingTableError = directErr;
+      continue;
+    }
     console.error(`Error updateTableRowById(${name}, ${id}) [direct]:`, directErr);
     throw directErr;
   }
+
+  throw lastMissingTableError || new Error(`No Supabase table found for ${primaryName}`);
 }
 
 /**
@@ -332,13 +465,24 @@ export async function updateTableRowById(tableName, id, row) {
  * @param {string} id
  */
 export async function deleteTableRowById(tableName, id) {
-  const name = getTableName(tableName);
+  const primaryName = getTableName(tableName);
+  let lastMissingTableError = null;
 
-  const { error } = await supabase.from(name).delete().eq('id', id);
-  if (error) {
+  for (const name of getTableCandidateNames(tableName)) {
+    const { error } = await supabase.from(name).delete().eq('id', id);
+    if (!error) {
+      rememberResolvedTableName(primaryName, name);
+      return;
+    }
+    if (isPostgrestMissingTableError(error)) {
+      lastMissingTableError = error;
+      continue;
+    }
     console.error(`Error deleteTableRowById(${name}, ${id}):`, error);
     throw error;
   }
+
+  throw lastMissingTableError || new Error(`No Supabase table found for ${primaryName}`);
 }
 
 /**
@@ -388,7 +532,7 @@ export async function getTableHeaders(tableName) {
  * @param {Array<object|Array>} rows
  */
 export async function batchInsertTableRows(tableName, rows) {
-  const name = getTableName(tableName);
+  const primaryName = getTableName(tableName);
   if (!rows?.length) return;
 
   const normalizeRow = (row) =>
@@ -396,44 +540,76 @@ export async function batchInsertTableRows(tableName, rows) {
       ? Object.fromEntries(row.map((v, j) => [`col_${j}`, v]))
       : (row && typeof row === 'object' ? row : {});
 
-  let nextOrder = -1;
-  const { data: maxRow, error: maxErr } = await supabase
-    .from(name)
-    .select('sort_order')
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let lastMissingTableError = null;
 
-  let shouldFallbackToDirect = !!maxErr && isLegacyJsonSchemaError(maxErr);
-  let legacyFailedMidway = false;
+  for (const name of getTableCandidateNames(tableName)) {
+    let nextOrder = -1;
+    const { data: maxRow, error: maxErr } = await supabase
+      .from(name)
+      .select('sort_order')
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (!maxErr) {
-    if (maxRow?.sort_order != null) nextOrder = maxRow.sort_order;
+    let shouldFallbackToDirect = !!maxErr && isLegacyJsonSchemaError(maxErr);
+    let legacyFailedMidway = false;
+
+    if (maxErr && isPostgrestMissingTableError(maxErr)) {
+      lastMissingTableError = maxErr;
+      continue;
+    }
+
+    if (!maxErr) {
+      if (maxRow?.sort_order != null) nextOrder = maxRow.sort_order;
+      for (let i = 0; i < rows.length; i++) {
+        nextOrder += 1;
+        const record = normalizeRow(rows[i]);
+        const { error } = await supabase.from(name).insert({ sort_order: nextOrder, record });
+        if (error) {
+          if (isPostgrestMissingTableError(error)) {
+            lastMissingTableError = error;
+            legacyFailedMidway = true;
+            shouldFallbackToDirect = false;
+            break;
+          }
+          if (isLegacyJsonSchemaError(error)) {
+            legacyFailedMidway = true;
+            break;
+          }
+          throw error;
+        }
+      }
+      if (!legacyFailedMidway) {
+        rememberResolvedTableName(primaryName, name);
+        return;
+      }
+      if (shouldFallbackToDirect !== false) shouldFallbackToDirect = true;
+    } else if (!isLegacyJsonSchemaError(maxErr)) {
+      throw maxErr;
+    }
+
+    if (!shouldFallbackToDirect) continue;
+
+    let directMissing = false;
     for (let i = 0; i < rows.length; i++) {
-      nextOrder += 1;
-      const record = normalizeRow(rows[i]);
-      const { error } = await supabase.from(name).insert({ sort_order: nextOrder, record });
+      const directPayload = normalizeRow(rows[i]);
+      const { error } = await supabase.from(name).insert(directPayload);
       if (error) {
-        if (isLegacyJsonSchemaError(error)) {
-          legacyFailedMidway = true;
+        if (isPostgrestMissingTableError(error)) {
+          lastMissingTableError = error;
+          directMissing = true;
           break;
         }
         throw error;
       }
     }
-    if (!legacyFailedMidway) return;
-    shouldFallbackToDirect = true;
-  } else if (!isLegacyJsonSchemaError(maxErr)) {
-    throw maxErr;
+    if (!directMissing) {
+      rememberResolvedTableName(primaryName, name);
+      return;
+    }
   }
 
-  if (!shouldFallbackToDirect) return;
-
-  for (let i = 0; i < rows.length; i++) {
-    const directPayload = normalizeRow(rows[i]);
-    const { error } = await supabase.from(name).insert(directPayload);
-    if (error) throw error;
-  }
+  throw lastMissingTableError || new Error(`No Supabase table found for ${primaryName}`);
 }
 
 /**

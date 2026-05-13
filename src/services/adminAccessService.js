@@ -4,6 +4,8 @@
  */
 import { supabase } from '../lib/supabaseClient';
 
+const enableSuperAdminRpc = process.env.REACT_APP_ENABLE_SUPER_ADMIN_RPC === 'true';
+
 export async function listAllowedAdmins() {
   const { data, error } = await supabase
     .from('allowed_admins')
@@ -31,6 +33,7 @@ export async function removeAllowedAdmin(id) {
 }
 
 export async function checkIsSuperAdmin() {
+  if (!enableSuperAdminRpc) return false;
   const { data, error } = await supabase.rpc('is_super_admin');
   if (error) return false;
   return data === true;

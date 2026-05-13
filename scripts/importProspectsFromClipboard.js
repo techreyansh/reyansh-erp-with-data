@@ -1,8 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://azwdxgahmdgccfimhtmm.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_YxXj5yo7tRaXmNy9zEW21g_-UWlBRTg';
-const TARGET_TABLE = 'clients2';
+const SUPABASE_URL = 'https://pkwnkfxlhuwnhxbbftmf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_8CQP4xzQN8K0-1-8Z6OtVQ_6yg8QIGN';
+const TARGET_TABLE = 'clients';
 
 function parseDelimited(text, delimiter = '\t') {
   const rows = [];

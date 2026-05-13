@@ -3,20 +3,14 @@ import config from '../config/config';
 import { parseJsonArray } from '../utils/parseJsonField';
 import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
 
-/** Logical key from config → resolved via db.TABLE_NAMES / getTableName (must match public.clients2). */
+/** Logical key from config → resolved via db.TABLE_NAMES / getTableName (usually public.clients). */
 const CLIENTS_LOGICAL = config.sheets.clients;
-const CLIENTS_TABLE = db.getTableName(CLIENTS_LOGICAL) || 'clients2';
+const CLIENTS_TABLE = db.getTableName(CLIENTS_LOGICAL) || 'clients';
 
 console.log('[clientService] clients table resolution', {
   'config.sheets.clients': CLIENTS_LOGICAL,
 });
 console.log('FINAL TABLE NAME:', CLIENTS_TABLE);
-
-if (CLIENTS_TABLE !== 'clients2') {
-  console.error(
-    '[clientService] Expected physical table "clients2" (public.clients2). Adjust db.TABLE_NAMES CLIENT/clients if your table name differs.'
-  );
-}
 
 // Generate unique client code sequentially (C + 5 digits, e.g., C00001)
 export async function generateSequentialClientCode() {
