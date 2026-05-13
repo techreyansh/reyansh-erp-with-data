@@ -84,8 +84,7 @@ const AdminAccessControlSection = ({ userEmail }) => {
           <Typography variant="h6">Admin Access Control</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Emails listed here receive full ERP access via database RLS (<code>is_super_admin</code>). Access is
-          enforced server-side; this panel is only for convenience. Signed-in as:{' '}
+          Emails listed here are managed in the Supabase admin allowlist table. Signed-in as:{' '}
           <strong>{userEmail || '—'}</strong>
         </Typography>
 
@@ -135,7 +134,7 @@ const AdminAccessControlSection = ({ userEmail }) => {
             ))}
             {rows.length === 0 && (
               <Typography variant="body2" color="text.secondary">
-                No rows returned. Ensure the Supabase migration ran and your user is a super admin.
+                No rows returned. Ensure the Supabase admin allowlist table exists and is readable.
               </Typography>
             )}
           </List>

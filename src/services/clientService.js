@@ -1,16 +1,8 @@
 import * as db from '../lib/db';
-import config from '../config/config';
 import { parseJsonArray } from '../utils/parseJsonField';
 import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
 
-/** Logical key from config → resolved via db.TABLE_NAMES / getTableName (usually public.clients). */
-const CLIENTS_LOGICAL = config.sheets.clients;
-const CLIENTS_TABLE = db.getTableName(CLIENTS_LOGICAL) || 'clients';
-
-console.log('[clientService] clients table resolution', {
-  'config.sheets.clients': CLIENTS_LOGICAL,
-});
-console.log('FINAL TABLE NAME:', CLIENTS_TABLE);
+const CLIENTS_TABLE = 'clients';
 
 // Generate unique client code sequentially (C + 5 digits, e.g., C00001)
 export async function generateSequentialClientCode() {

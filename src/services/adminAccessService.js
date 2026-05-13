@@ -1,10 +1,8 @@
 /**
  * Super-admin allowlist (public.allowed_admins).
- * Enforced by RLS — only is_super_admin() can read/write; never rely on this for security.
+ * Access is enforced by the database policies configured in Supabase.
  */
 import { supabase } from '../lib/supabaseClient';
-
-const enableSuperAdminRpc = process.env.REACT_APP_ENABLE_SUPER_ADMIN_RPC === 'true';
 
 export async function listAllowedAdmins() {
   const { data, error } = await supabase
@@ -33,8 +31,5 @@ export async function removeAllowedAdmin(id) {
 }
 
 export async function checkIsSuperAdmin() {
-  if (!enableSuperAdminRpc) return false;
-  const { data, error } = await supabase.rpc('is_super_admin');
-  if (error) return false;
-  return data === true;
+  return false;
 }
