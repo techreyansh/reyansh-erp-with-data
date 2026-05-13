@@ -356,65 +356,64 @@ const AttendanceTab = ({ employeeCode, attendance }) => {
             </Typography>
             
             {attendance.length > 0 ? (
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Date</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Clock In</TableCell>
-                      <TableCell>Clock Out</TableCell>
-                      <TableCell>Working Hours</TableCell>
-                      <TableCell>Notes</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedAttendance.map((record, index) => (
-                      <TableRow key={index} hover>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {formatDate(record.Date)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {new Date(record.Date).toLocaleDateString('en-US', { weekday: 'long' })}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            icon={getStatusIcon(record.Status)}
-                            label={record.Status || 'Present'}
-                            color={getStatusColor(record.Status)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {formatTime(record.ClockIn)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {formatTime(record.ClockOut)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                            {record.WorkingHours ? `${record.WorkingHours}h` : 'N/A'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {record.Notes || record.Remarks || '-'}
-                          </Typography>
-                        </TableCell>
+              <>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Clock In</TableCell>
+                        <TableCell>Clock Out</TableCell>
+                        <TableCell>Working Hours</TableCell>
+                        <TableCell>Notes</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              
-              {/* Pagination Controls */}
-              {attendance.length > 0 && (
+                    </TableHead>
+                    <TableBody>
+                      {paginatedAttendance.map((record, index) => (
+                        <TableRow key={index} hover>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {formatDate(record.Date)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(record.Date).toLocaleDateString('en-US', { weekday: 'long' })}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              icon={getStatusIcon(record.Status)}
+                              label={record.Status || 'Present'}
+                              color={getStatusColor(record.Status)}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {formatTime(record.ClockIn)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {formatTime(record.ClockOut)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {record.WorkingHours ? `${record.WorkingHours}h` : 'N/A'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {record.Notes || record.Remarks || '-'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
                 <TablePagination
                   component="div"
                   count={attendance.length}
@@ -426,7 +425,7 @@ const AttendanceTab = ({ employeeCode, attendance }) => {
                   labelRowsPerPage="Rows per page:"
                   labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
                 />
-              )}
+              </>
             ) : (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <DateRangeIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
