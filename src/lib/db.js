@@ -10,7 +10,7 @@ export const TABLE_NAMES = {
   Users: 'users',
   users: 'users',
 
-  // Clients — canonical migration table is public.clients; legacy projects may still use clients2.
+  // Clients — canonical migration table is public.clients.
   CLIENT: 'clients',
   clients: 'clients',
   PROSPECTS_CLIENTS: 'prospects_clients',
@@ -119,7 +119,6 @@ export const TABLE_NAMES = {
 };
 
 const TABLE_ALIASES = {
-  clients: ['clients2'],
   vendors: ['vendors_data'],
   stock: ['stock_data'],
   material_inward: ['material_inward_data'],
