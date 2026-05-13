@@ -3,7 +3,7 @@
  * Enables sign-in via Google Identity Services + supabase.auth.signInWithIdToken (bypasses broken code exchange).
  *
  * .env.local:
- *   REACT_APP_GOOGLE_OAUTH_CLIENT_ID=123456789-xxxx.apps.googleusercontent.com
+ *   REACT_APP_GOOGLE_OAUTH_CLIENT_ID=622049380084-2g1cbc6dqi56sun399c64ssghm3uss4i.apps.googleusercontent.com
  */
 export function getGoogleWebClientId() {
   return (process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_ID || '').trim();

@@ -1,8 +1,8 @@
-import { getCurrentOAuthSettings } from './config';
+import { getGoogleWebClientId } from '../lib/googleWebClientId';
 
 // Google OAuth configuration
 const oauthConfig = {
-  clientId:window.location.hostname.includes('vercel.app')? "686859527901-rb4nuehhml4b7jmrirpnengul9rehm7a.apps.googleusercontent.com":"686859527901-om7j9h4st5makfaog0p4tjmrnpcpav06.apps.googleusercontent.com", // Replace with your Google OAuth client ID
+  clientId: getGoogleWebClientId(), // Same Web Client ID configured in Supabase Auth -> Google
   scopes: [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",

@@ -26,15 +26,6 @@ import { StepStatusProvider } from './context/StepStatusContext';
 import Header from "./components/common/Header";
 import ScrollProgressBar from "./components/common/ScrollProgressBar";
 import Login from "./components/auth/Login";
-
-const Dashboard = lazy(() => import("./components/dashboard/Dashboard"));
-const WelcomePage = lazy(() => import("./pages/WelcomePage"));
-const CEOExecutiveDashboard = lazy(() => import("./components/ceoDashboard/CEOExecutiveDashboard"));
-const AdvancedEmployeeDashboard = lazy(() => import("./components/employeeDashboard/AdvancedEmployeeDashboard"));
-const CRMModulePage = lazy(() => import("./pages/crm/CRMModulePage"));
-const PPCModulePage = lazy(() => import("./pages/ppc/PPCModulePage"));
-const EmployeeTaskChecklist = lazy(() => import("./components/taskCompliance/EmployeeTaskChecklist"));
-const AdminTaskApprovalPanel = lazy(() => import("./components/taskCompliance/AdminTaskApprovalPanel"));
 import ProfilePage from "./components/common/ProfilePage";
 import SettingsPage from "./components/common/SettingsPage";
 import HelpPage from "./components/common/HelpPage";
@@ -117,6 +108,15 @@ import ProductionPlanningNavigation from './components/molding/ProductionPlannin
 import ProductionManagementNavigation from './components/molding/ProductionManagementNavigation';
 import ClientDashboard from './components/clientDashboard/ClientDashboard';
 import DocumentLibrary from './components/DocumentLibrary/DocumentLibrary';
+
+const Dashboard = lazy(() => import("./components/dashboard/Dashboard"));
+const WelcomePage = lazy(() => import("./pages/WelcomePage"));
+const CEOExecutiveDashboard = lazy(() => import("./components/ceoDashboard/CEOExecutiveDashboard"));
+const AdvancedEmployeeDashboard = lazy(() => import("./components/employeeDashboard/AdvancedEmployeeDashboard"));
+const CRMModulePage = lazy(() => import("./pages/crm/CRMModulePage"));
+const PPCModulePage = lazy(() => import("./pages/ppc/PPCModulePage"));
+const EmployeeTaskChecklist = lazy(() => import("./components/taskCompliance/EmployeeTaskChecklist"));
+const AdminTaskApprovalPanel = lazy(() => import("./components/taskCompliance/AdminTaskApprovalPanel"));
 
 const ProtectedRouteGate = ({ children }) => <ProtectedRoute>{children}</ProtectedRoute>;
 
