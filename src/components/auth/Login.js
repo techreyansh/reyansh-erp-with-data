@@ -21,10 +21,8 @@ import {
   TrendingUp,
   Security,
 } from "@mui/icons-material";
-import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
-import { getGoogleWebClientId } from "../../lib/googleWebClientId";
 
 const Login = () => {
   const theme = useTheme();
@@ -36,7 +34,6 @@ const Login = () => {
   ];
   
   const { error: authError, authLoading, syncUserFromSupabase, clearAuthSurfaceErrors } = useAuth();
-  const googleWebClientId = getGoogleWebClientId();
   const navigate = useNavigate();
   const [error, setError] = useState(null);
   const [oauthStarting, setOauthStarting] = useState(false);
@@ -68,34 +65,26 @@ const Login = () => {
     };
   }, [authLoading, navigate, syncUserFromSupabase]);
 
-  /** Requires REACT_APP_GOOGLE_OAUTH_CLIENT_ID — redirect OAuth is disabled (it hits "Unable to exchange external code"). */
-  const handleGoogleCredential = async (credentialResponse) => {
-    const token = credentialResponse?.credential;
-    if (!token) {
-      setError("Google did not return a sign-in token.");
-      return;
-    }
+  const handleGoogleSignIn = async () => {
     clearAuthSurfaceErrors();
+    setError(null);
     setOauthStarting(true);
     try {
-      const { error: idErr } = await supabase.auth.signInWithIdToken({
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        token,
+        options: {
+          redirectTo: window.location.origin,
+        },
       });
-      if (idErr) {
-        console.error("signInWithIdToken:", idErr);
-        setError(
-          idErr.message ||
-            "Google token was rejected by Supabase. Enable Google provider and use the same Web Client ID in Dashboard and in REACT_APP_GOOGLE_OAUTH_CLIENT_ID."
-        );
-        return;
+
+      if (oauthError) {
+        console.error("signInWithOAuth:", oauthError);
+        setError(oauthError.message || "Google sign-in could not start.");
+        setOauthStarting(false);
       }
-      await syncUserFromSupabase();
-      navigate("/home", { replace: true });
     } catch (e) {
-      console.error("Google ID sign-in exception:", e);
+      console.error("Google OAuth sign-in exception:", e);
       setError("Google sign-in failed unexpectedly.");
-    } finally {
       setOauthStarting(false);
     }
   };
@@ -406,45 +395,6 @@ const Login = () => {
                       </Grow>
                     )}
 
-                    {!googleWebClientId && (
-                      <Grow in timeout={250}>
-                        <Alert severity="warning" sx={{ mb: 3, borderRadius: 3 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                            Google sign-in is misconfigured for this project
-                          </Typography>
-                          <Typography variant="body2" sx={{ mb: 1 }}>
-                            In the project root file <code style={{ fontSize: "0.85em" }}>.env</code>, the line{" "}
-                            <code style={{ fontSize: "0.85em" }}>REACT_APP_GOOGLE_OAUTH_CLIENT_ID</code> must
-                            have your real <strong>Web Client ID</strong> after the <code>=</code>. If there is
-                            nothing after <code>=</code>, the button stays hidden.
-                          </Typography>
-                          <Typography variant="body2" sx={{ mb: 1 }}>
-                            Copy the Client ID from: Supabase → <strong>Authentication</strong> →{" "}
-                            <strong>Providers</strong> → <strong>Google</strong> (same value you already use
-                            there).
-                          </Typography>
-                          <Typography
-                            component="pre"
-                            sx={{
-                              m: 0,
-                              p: 1.5,
-                              borderRadius: 1,
-                              bgcolor: "grey.100",
-                              fontSize: "0.8rem",
-                              overflow: "auto",
-                            }}
-                          >
-                            REACT_APP_GOOGLE_OAUTH_CLIENT_ID=123456789-abc.apps.googleusercontent.com
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 1 }}>
-                            Save <code>.env</code>, stop the dev server (Ctrl+C), run <code>npm start</code>{" "}
-                            again. Full-page redirect sign-in is <strong>disabled</strong> here (it caused
-                            &quot;Unable to exchange external code&quot;).
-                          </Typography>
-                        </Alert>
-                      </Grow>
-                    )}
-
                     {/* Error alert */}
                     {(error || authError) && (
                       <Grow in timeout={200}>
@@ -464,7 +414,7 @@ const Login = () => {
                       </Grow>
                     )}
 
-                    {/* Google: ID token only (no redirect — avoids broken Supabase code exchange). */}
+                    {/* Google authentication is handled only by Supabase OAuth. */}
                     <Grow in timeout={2000}>
                       <Box
                         sx={{
@@ -475,42 +425,23 @@ const Login = () => {
                           gap: 2,
                         }}
                       >
-                        {googleWebClientId ? (
-                          <Box
-                            sx={{
-                              width: "100%",
-                              display: "flex",
-                              justifyContent: "center",
-                              opacity: oauthStarting ? 0.65 : 1,
-                              pointerEvents: oauthStarting ? "none" : "auto",
-                              "& iframe": { width: "100% !important", maxWidth: 400 },
-                            }}
-                          >
-                            <GoogleLogin
-                              onSuccess={(c) => void handleGoogleCredential(c)}
-                              onError={() =>
-                                setError("Google sign-in was cancelled or could not start.")
-                              }
-                              useOneTap={false}
-                              theme="outline"
-                              size="large"
-                              text="signin_with"
-                              shape="rectangular"
-                              width={360}
-                            />
-                          </Box>
-                        ) : (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            align="center"
-                            sx={{ px: 1 }}
-                          >
-                            No button yet: paste your Web Client ID after the <code>=</code> in{" "}
-                            <code>.env</code>, then restart <code>npm start</code> (Create React App only reads{" "}
-                            <code>.env</code> when the server starts).
-                          </Typography>
-                        )}
+                        <Button
+                          type="button"
+                          variant="contained"
+                          size="large"
+                          fullWidth
+                          disabled={oauthStarting}
+                          onClick={() => void handleGoogleSignIn()}
+                          sx={{
+                            py: 1.5,
+                            borderRadius: 3,
+                            textTransform: "none",
+                            fontSize: "1rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {oauthStarting ? "Redirecting to Google..." : "Continue with Google"}
+                        </Button>
                       </Box>
                     </Grow>
 

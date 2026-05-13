@@ -69,24 +69,22 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | **emailjs-com** | ^3.2.0 | Email sending from the client |
-| **gapi-script** | ^1.2.0 | Google API client loading |
-| **google-spreadsheet** | ^4.1.2 | Google Sheets API (read/write) |
+| **@supabase/supabase-js** | ^2.97.0 | Auth, database, and storage client |
 
 ---
 
 ## 3. Backend & data layer
 
-- **No custom backend server.** The app talks directly to Google from the browser.
-- **Google APIs used:**
-  - **Google Identity Services (GIS)** – Sign-in, OAuth 2.0.
-  - **Google Sheets API v4** – Primary data store (POs, SOs, inventory, users, purchase flow, sales flow, CRM, etc.).
-  - **Google Drive API** – File/document access where configured.
+- **No custom backend server.** The app talks directly to Supabase from the browser.
+- **Supabase APIs used:**
+  - **Supabase Auth** – Google OAuth redirect sign-in.
+  - **PostgREST** – Entity tables for ERP data.
+  - **Storage** – File/document access where configured.
 - **Auth & persistence:**
-  - **sessionStorage** – `currentUser`, `googleToken` (per tab).
-  - **config.useLocalStorage** – Optional flag to use localStorage and mock user (e.g. for dev without Sheets).
+  - **Supabase auth storage** – persisted by `@supabase/supabase-js`.
+  - **AuthContext** – maps the Supabase session to app user/role state.
 - **User/role source:**  
-  - Production: Users sheet in the same Google Spreadsheet (Email, Role, Permissions).  
-  - Dev/mock: In-memory mock user (e.g. Customer Relations Manager or CEO via direct login).
+  - Production: Supabase `users` / `roles` tables plus `is_super_admin` RPC where available.
 
 ---
 
@@ -94,13 +92,11 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 
 | Aspect | Implementation |
 |--------|----------------|
-| **Provider** | Google OAuth 2.0 (GIS + `https://apis.google.com/js/api.js`) |
-| **Scopes** | `openid`, `userinfo.email`, `userinfo.profile`, `spreadsheets`, `drive.file`, `drive` |
-| **Client IDs** | Separate IDs for localhost vs Vercel (see `oauthConfig.js`) |
-| **Redirect URI** | Vercel URL when on localhost or Vercel; otherwise `window.location.origin` |
-| **Token storage** | sessionStorage (`googleToken`, `currentUser`) |
-| **Validation** | Token checked with `https://www.googleapis.com/oauth2/v3/userinfo`; periodic re-check (e.g. every 9 hours) |
-| **Role-based access** | `authService.hasRole(role)`, `getUserRole()` from `authUtils`; menu and routes filtered by role (e.g. CEO-only `/ceo-command`) |
+| **Provider** | Supabase Auth with Google OAuth |
+| **Redirect URI** | `window.location.origin` from `supabase.auth.signInWithOAuth` |
+| **Token storage** | Supabase auth client persistence |
+| **Validation** | `supabase.auth.getSession()` and auth state listener |
+| **Role-based access** | `AuthContext` user role/roleCode; menu and routes filtered by role (e.g. CEO-only `/ceo-command`) |
 | **CEO-only route** | `CEOOnlyRoute` + `ceoDashboardAccessLog` for access attempts (ready for backend audit later) |
 
 ---
@@ -110,8 +106,9 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 | File / env | Purpose |
 |------------|---------|
 | **src/config/config.js** | Spreadsheet ID, API key, sheet names, status codes, purchase/sales flow config, feature flags |
-| **src/config/oauthConfig.js** | OAuth client IDs, scopes, redirect URI, allowed origins |
-| **REACT_APP_USE_LOCAL_STORAGE** | When `"true"`, use localStorage and mock user (no Sheets auth required) |
+| **REACT_APP_SUPABASE_URL** | Supabase project URL |
+| **REACT_APP_SUPABASE_ANON_KEY** | Supabase publishable/anon key |
+| **REACT_APP_GOOGLE_OAUTH_CLIENT_ID** | Google Web Client ID configured in the Supabase Google provider |
 | **public/** | Static assets (favicon, manifest, logo, `index.html`) |
 
 ---
@@ -120,9 +117,9 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 
 ```
 src/
-├── config/           # config.js, oauthConfig.js
+├── config/           # config.js
 ├── context/          # AuthContext, StepStatusContext
-├── services/         # sheetService, authService, *Service (client, po, flow, CRM, etc.)
+├── services/         # sheetService, *Service (client, po, flow, CRM, etc.)
 ├── utils/            # authUtils, ceoAccess, dateRestrictions, backwardPlanning, etc.
 ├── components/
 │   ├── auth/         # Login, PrivateRoute, CEOOnlyRoute

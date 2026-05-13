@@ -34,10 +34,10 @@ The Reyansh Factory AI is a comprehensive manufacturing management system built 
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                 GOOGLE SHEETS API                           │
+│                 SUPABASE API                                │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
-│  │   Data      │  │   Auth      │  │   Drive     │        │
-│  │   Storage   │  │   (OAuth)   │  │   API       │        │
+│  │   Data      │  │   Auth      │  │ Storage     │        │
+│  │   Storage   │  │   (OAuth)   │  │ Buckets     │        │
 │  └─────────────┘  └─────────────┘  └─────────────┘        │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -45,8 +45,8 @@ The Reyansh Factory AI is a comprehensive manufacturing management system built 
 ## 📋 System Modules
 
 ### 1. **Authentication & Authorization**
-- **File**: `src/components/auth/Login.js`, `src/services/authService.js`
-- **Features**: Google OAuth 2.0, Role-based access control, Mock login for development
+- **File**: `src/components/auth/Login.js`, `src/context/AuthContext.js`
+- **Features**: Supabase Google OAuth, Role-based access control
 - **Roles**: CEO, Customer Relations Manager, Store Manager, Production Supervisors, QC Manager, etc.
 
 ### 2. **Dashboard System**
@@ -208,19 +208,18 @@ The system uses a single Google Spreadsheet with multiple sheets:
 
 ## 🔧 Integration Points
 
-### 1. **Google Sheets API Integration**
+### 1. **Supabase API Integration**
 - **Service**: `src/services/sheetService.js`
-- **Features**: CRUD operations, batch updates, real-time sync
-- **Authentication**: OAuth 2.0 with Google Identity Services
+- **Features**: CRUD operations against Supabase-backed entity tables
+- **Authentication**: Supabase Auth with Google OAuth redirect
 
 ### 2. **OAuth Configuration**
-- **File**: `src/config/oauthConfig.js`
-- **Scopes**: Spreadsheets, Drive, User Info
-- **Environments**: Localhost, Vercel production
+- **Provider**: Supabase Auth Google provider
+- **Redirect**: `window.location.origin`
+- **Environments**: Vercel Production, Preview, and Development use the same `REACT_APP_*` variables
 
 ### 3. **Service Layer Architecture**
 Each business module has its own service:
-- `authService.js` - Authentication
 - `salesFlowService.js` - Sales process
 - `purchaseFlowService.js` - Purchase process
 - `flowService.js` - Task management
@@ -243,17 +242,15 @@ npm start
 npm run build
 ```
 
-### 2. **Google Sheets Setup**
-1. Create Google Cloud Project
-2. Enable Google Sheets API and Google Drive API
-3. Create OAuth 2.0 credentials
-4. Create Google Spreadsheet with required sheets
-5. Configure API keys in `src/config/config.js`
+### 2. **Supabase Setup**
+1. Create or open the Supabase project
+2. Apply migrations under `supabase/migrations/`
+3. Enable the Supabase Google provider with the Google Web Client ID and secret
+4. Add the production Vercel URL to Supabase Redirect URLs
 
 ### 3. **OAuth Configuration**
-- Update `src/config/oauthConfig.js` with your OAuth client ID
-- Configure redirect URIs for different environments
-- Set up allowed origins for CORS
+- Set `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`, and `REACT_APP_GOOGLE_OAUTH_CLIENT_ID`
+- Configure these variables in Vercel for Production, Preview, and Development
 
 ### 4. **Sheet Initialization**
 - Use `src/components/admin/SheetInitializer.js` to set up required sheets

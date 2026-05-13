@@ -306,30 +306,4 @@ Object.freeze(configCopy.purchaseFlow.roles);
 Object.freeze(configCopy.purchaseFlow.documentTypes);
 Object.freeze(configCopy.externalLinks);
 
-// Environment-based configuration
-const isProduction = process.env.NODE_ENV === 'production';
-const isVercel = process.env.VERCEL === '1';
-
-// OAuth configuration based on environment
-export const oauthSettings = {
-  // For localhost development
-  localhost: {
-    redirectUri: 'http://localhost:3000',
-    allowedOrigins: ['http://localhost:3000', 'http://localhost:3001']
-  },
-  // For Vercel production
-  vercel: {
-    redirectUri: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-    allowedOrigins: []
-  }
-};
-
-// Get current environment settings
-export const getCurrentOAuthSettings = () => {
-  if (isVercel && process.env.VERCEL_URL) {
-    return oauthSettings.vercel;
-  }
-  return oauthSettings.localhost;
-};
-
 export default configCopy;

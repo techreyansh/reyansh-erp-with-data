@@ -124,9 +124,9 @@ Open browser console (F12) to see debug logs when testing.
 
 ### Production Deployment:
 
-When deploying to production, you can remove the mock login functionality by:
-1. Removing mock login code from `authService.js`
-2. All matching will use real Google emails only
+Production uses Supabase Auth Google OAuth. Ensure Vercel has the required `REACT_APP_*`
+environment variables in Production, Preview, and Development, and role matching will use
+the authenticated Supabase user email.
 
 ## 🎉 Ready to Use!
 

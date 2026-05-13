@@ -17,9 +17,7 @@ import {
 import { buildAppTheme } from "./theme/buildAppTheme";
 import { ThemeModeProvider, useThemeMode } from "./context/ThemeModeContext";
 import { setGlobalErrorNotifier } from "./lib/supabaseErrorHandler";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider } from "./context/AuthContext";
-import { getGoogleWebClientId } from "./lib/googleWebClientId";
 import { UserProvider } from "./context/UserContext";
 import { StepStatusProvider } from './context/StepStatusContext';
 
@@ -775,19 +773,12 @@ function AppShell() {
 function ThemedApp() {
   const { mode } = useThemeMode();
   const theme = useMemo(() => buildAppTheme(mode), [mode]);
-  const googleClientId = getGoogleWebClientId();
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <GlobalErrorToaster>
-        {googleClientId ? (
-          <GoogleOAuthProvider clientId={googleClientId}>
-            <AppShell />
-          </GoogleOAuthProvider>
-        ) : (
-          <AppShell />
-        )}
+        <AppShell />
       </GlobalErrorToaster>
     </ThemeProvider>
   );

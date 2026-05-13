@@ -25,7 +25,6 @@ import {
   Storage as StorageIcon
 } from '@mui/icons-material';
 import config from '../../config/config';
-import oauthConfig from '../../config/oauthConfig';
 import * as db from '../../lib/db';
 
 const SheetsTroubleshooting = () => {
@@ -88,7 +87,7 @@ const SheetsTroubleshooting = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             label="Google OAuth Client ID"
-            value={oauthConfig.clientId ? '✓ Set' : 'Not set'}
+            value={process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_ID ? '✓ Set' : 'Not set'}
             fullWidth
             InputProps={{ readOnly: true }}
             variant="outlined"
@@ -98,8 +97,8 @@ const SheetsTroubleshooting = () => {
         </Grid>
         <Grid item xs={12}>
           <TextField
-            label="OAuth scopes"
-            value={Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.join(', ') : oauthConfig.scopes}
+            label="OAuth provider"
+            value="Supabase Google OAuth redirect"
             fullWidth
             InputProps={{ readOnly: true }}
             variant="outlined"

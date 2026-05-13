@@ -4,14 +4,12 @@
 
 /**
  * After Google sign-in, Supabase sends the user here (app root). Must be in Supabase Redirect URLs.
- * PKCE verifier is per-origin — always use the same host/port as the address bar (localhost vs 127.0.0.1).
+ * PKCE verifier is per-origin — always use the same origin as the address bar.
  */
 export function getOAuthRedirectUrl() {
   if (typeof window === 'undefined') {
-    return process.env.REACT_APP_OAUTH_REDIRECT_URL?.trim() || 'http://localhost:3000';
+    return 'https://reyansh-erp-with-data-wy3j.vercel.app';
   }
-  const forced = process.env.REACT_APP_OAUTH_REDIRECT_URL?.trim();
-  if (forced) return forced;
   return window.location.origin;
 }
 
@@ -24,16 +22,6 @@ export function getSupabaseProjectOrigin() {
   } catch {
     return null;
   }
-}
-
-/** Options for supabase.auth.signInWithOAuth({ provider: 'google', options }) — single place, no redundant scopes. */
-export function getGoogleSignInWithOAuthOptions() {
-  return {
-    redirectTo: getOAuthRedirectUrl(),
-    queryParams: {
-      prompt: 'consent select_account',
-    },
-  };
 }
 
 export function getSupabaseGoogleRedirectCallbackUrl() {
@@ -91,31 +79,24 @@ export function clearOAuthCallbackFromBrowserUrl() {
 
 export function googleOAuthExchangeFailureHint() {
   const supabaseCallback = getSupabaseGoogleRedirectCallbackUrl();
+  const appOrigin = getOAuthRedirectUrl();
   const supabaseOrigin = getSupabaseProjectOrigin();
-  const appOrigin =
-    typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const jsOrigins = [appOrigin, supabaseOrigin].filter(Boolean);
   return [
     '',
-    'This app uses Google sign-in via ID token (login page button), not full-page redirect.',
-    'Set REACT_APP_GOOGLE_OAUTH_CLIENT_ID to the same Web Client ID as Supabase → Auth → Google,',
-    `add under Google Cloud → Web client → Authorized JavaScript origins: ${jsOrigins.join(', ')}`,
+    'This app uses Google sign-in through Supabase OAuth redirect only.',
+    'Vercel environment variables must be set for Production, Preview, and Development:',
+    '  REACT_APP_SUPABASE_URL=https://pkwnkfxlhuwnhxbbftmf.supabase.co',
+    '  REACT_APP_SUPABASE_ANON_KEY=<publishable key>',
+    '  REACT_APP_GOOGLE_OAUTH_CLIENT_ID=<Google Web Client ID used by Supabase>',
     '',
-    '— If you still need redirect OAuth fixed (other clients / bookmarks): —',
+    'Supabase Dashboard → Authentication → URL Configuration → Redirect URLs must include:',
+    `  ${appOrigin}`,
+    '  https://reyansh-erp-with-data-wy3j.vercel.app',
     '',
-    'A) Supabase Dashboard → Auth → Google → copy Callback URL exactly into Google → Authorized redirect URIs:',
+    'Google Cloud → Web client → Authorized redirect URIs must include the Supabase callback:',
     `   ${supabaseCallback}`,
     '',
-    'B) Same Web client: Authorized JavaScript origins:',
-    ...jsOrigins.map((o) => `   • ${o}`),
-    '',
-    'C) Supabase Google provider: same Client ID + Secret as that Web client (no spaces).',
-    '',
-    'D) OAuth consent: Testing → add your Gmail as Test user; scopes openid, email, profile.',
-    '',
-    `E) Supabase Redirect URLs must include: ${appOrigin}`,
-    '',
-    'F) Still broken: new Web OAuth client, re-paste ID+secret in Supabase, wait 1–2 min.',
-    '   Supabase → Logs → Auth for the raw error.',
+    `Supabase project origin: ${supabaseOrigin || '(not configured)'}`,
+    'If sign-in still fails, check Supabase → Logs → Auth for the raw provider error.',
   ].join('\n');
 }
