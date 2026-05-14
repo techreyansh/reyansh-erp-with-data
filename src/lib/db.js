@@ -5,6 +5,105 @@
 import { supabase } from './supabaseClient';
 import config from '../config/config';
 
+const KNOWN_SUPABASE_TABLES = new Set([
+  'approve_payment_terms',
+  'approve_strategic_deals',
+  'audit_log',
+  'audit_logs',
+  'bom',
+  'bom_templates',
+  'branches',
+  'check_feasibility',
+  'clients',
+  'comparative_statement',
+  'confirm_standard_and_compliance',
+  'crm_activities',
+  'crm_calllogs',
+  'crm_calltasks',
+  'crm_communications',
+  'crm_interactions',
+  'crm_invoices',
+  'crm_logs',
+  'crm_notes',
+  'crm_opportunities',
+  'crm_ordertaking',
+  'crm_payments',
+  'crm_reminder_templates',
+  'crm_tasklogs',
+  'crm_tasks',
+  'customers',
+  'daily_capacity',
+  'dispatches',
+  'documents',
+  'employees',
+  'evaluate_high_value_prospects',
+  'finished_goods',
+  'follow_up_delivery',
+  'follow_up_quotations',
+  'generate_grn',
+  'get_approval_for_sample',
+  'initial_call',
+  'inspect_material',
+  'inspect_sample',
+  'inventory',
+  'inventory_batches',
+  'inventory_movements',
+  'inventory_stock',
+  'inventory_transactions',
+  'kitting_sheet',
+  'log_and_qualify_leads',
+  'material_approval',
+  'material_inward',
+  'material_issue',
+  'payments',
+  'place_po',
+  'po_import_temp',
+  'po_master',
+  'product_categories',
+  'products',
+  'prospects_clients',
+  'purchase_flow_steps',
+  'purchase_flows',
+  'purchase_order_items',
+  'purchase_order_steps',
+  'purchase_orders',
+  'release_payment',
+  'request_sample',
+  'return_history',
+  'return_material',
+  'rfq',
+  'roles',
+  'sales_flow_steps',
+  'sales_flows',
+  'sales_order_items',
+  'sales_order_steps',
+  'sales_orders',
+  'sample_submission',
+  'schedule_payment',
+  'send_quotation',
+  'sheet_approve_quotation',
+  'sort_vendor',
+  'stock',
+  'units_of_measure',
+  'users',
+  'whatsapp_logs',
+]);
+
+const UNMAPPED_TABLE_PREFIX = '__unmapped__:';
+
+function toSnakeCase(value) {
+  return String(value)
+    .replace(/\s+/g, '_')
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .toLowerCase();
+}
+
+function toKnownTableName(tableName, fallbackName) {
+  if (tableName && KNOWN_SUPABASE_TABLES.has(tableName)) return tableName;
+  const fallback = fallbackName ? toSnakeCase(fallbackName) : tableName;
+  return `${UNMAPPED_TABLE_PREFIX}${fallback || 'unknown'}`;
+}
+
 export const TABLE_NAMES = {
   // Auth & users
   Users: 'users',
@@ -15,18 +114,20 @@ export const TABLE_NAMES = {
   clients: 'clients',
   PROSPECTS_CLIENTS: 'prospects_clients',
   prospects_clients: 'prospects_clients',
-  Client_Orders: 'client_orders_data',
-  client_orders: 'client_orders_data',
-  Client_Payments: 'client_payments_data',
-  client_payments: 'client_payments_data',
-  Client_Quotations: 'client_quotations_data',
-  client_quotations: 'client_quotations_data',
-  Client_Notifications: 'client_notifications_data',
-  client_notifications: 'client_notifications_data',
+  Client_Orders: 'sales_orders',
+  client_orders: 'sales_orders',
+  Client_Payments: 'payments',
+  client_payments: 'payments',
+  Client_Quotations: 'send_quotation',
+  client_quotations: 'send_quotation',
+  Client_Notifications: 'crm_communications',
+  client_notifications: 'crm_communications',
+  Client_Messages: 'whatsapp_logs',
+  client_messages: 'whatsapp_logs',
 
   // Vendors & stock
-  Vendor: 'vendors',
-  vendors: 'vendors',
+  Vendor: null,
+  vendors: null,
   Stock: 'stock',
   stock: 'stock',
   'Material Inward': 'material_inward',
@@ -53,7 +154,6 @@ export const TABLE_NAMES = {
   sales_flow_steps: 'sales_flow_steps',
   LogAndQualifyLeads: 'log_and_qualify_leads',
   InitialCall: 'initial_call',
-  // Migration 20250223100000: public.send_quotation (legacy deploys may use send_quotation_data)
   SendQuotation: 'send_quotation',
   ApprovePaymentTerms: 'approve_payment_terms',
   SampleSubmission: 'sample_submission',
@@ -61,7 +161,6 @@ export const TABLE_NAMES = {
   ApproveStrategicDeals: 'approve_strategic_deals',
   EvaluateHighValueProspects: 'evaluate_high_value_prospects',
   CheckFeasibility: 'check_feasibility',
-  // Matches supabase/migrations/20250223100000_replace_sheet_rows_with_entity_tables.sql (not *_data).
   ConfirmStandardAndCompliance: 'confirm_standard_and_compliance',
   FollowUpQuotations: 'follow_up_quotations',
   'Comparative Statement': 'comparative_statement',
@@ -84,14 +183,18 @@ export const TABLE_NAMES = {
   products: 'products',
   PO_Master: 'po_master',
   po_master: 'po_master',
+  SO_Master: 'sales_orders',
+  so_master: 'sales_orders',
+  Inventory: 'inventory',
+  inventory: 'inventory',
   Daily_CAPACITY: 'daily_capacity',
   daily_capacity: 'daily_capacity',
-  'Cable Products': 'cable_products',
-  cable_products: 'cable_products',
-  'Cable Production Plans': 'cable_production_plans',
-  cable_production_plans: 'cable_production_plans',
-  'Machine Schedules': 'machine_schedules',
-  machine_schedules: 'machine_schedules',
+  'Cable Products': null,
+  cable_products: null,
+  'Cable Production Plans': null,
+  cable_production_plans: null,
+  'Machine Schedules': null,
+  machine_schedules: null,
   RFQ: 'rfq',
   rfq: 'rfq',
   BOM_Templates: 'bom_templates',
@@ -106,52 +209,51 @@ export const TABLE_NAMES = {
   inspect_sample: 'inspect_sample',
 
   // HR / admin custom data tables
-  Employees: 'employees_data',
-  employees: 'employees_data',
-  Performance: 'performance_data',
-  performance: 'performance_data',
-  Attendance: 'attendance_data',
-  attendance: 'attendance_data',
-  EmployeeTasks: 'employee_tasks_data',
-  employee_tasks: 'employee_tasks_data',
-  Notifications: 'notifications_data',
-  notifications: 'notifications_data',
+  Employees: 'employees',
+  employees: 'employees',
+  Performance: 'user_scores',
+  performance: 'user_scores',
+  Attendance: null,
+  attendance: null,
+  EmployeeTasks: 'task_instances',
+  employee_tasks: 'task_instances',
+  Notifications: 'task_audit_log',
+  notifications: 'task_audit_log',
+
+  // CRM / payment reminder tables
+  CRM_Opportunities: 'crm_opportunities',
+  CRM_Activities: 'crm_activities',
+  CRM_Interactions: 'crm_interactions',
+  CRM_Tasks: 'crm_tasks',
+  CRM_Notes: 'crm_notes',
+  CRM_OrderTaking: 'crm_ordertaking',
+  CRM_CallLogs: 'crm_calllogs',
+  CRM_Payments: 'crm_payments',
+  CRM_Invoices: 'crm_invoices',
+  CRM_ReminderTemplates: 'crm_reminder_templates',
+  CRM_Communications: 'crm_communications',
+  CRM_CallTasks: 'crm_calltasks',
+  CRM_TaskLogs: 'crm_tasklogs',
+  Petty_Cash: 'payments',
+  Enquiries: 'crm_logs',
+  Enquiries_Export: 'crm_logs',
+  Enquiries_IndiaMart: 'crm_logs',
+  Checklists: 'task_templates',
+  Delegation: 'task_instances',
+  MIS_Scores: 'user_scores',
+  Delegation_Scores: 'user_scores',
+  Employee_Dashboards: 'employees',
+  Quotation_Formats: 'send_quotation',
+  SCOT_Sheet: null,
+  Die_Repair: null,
+  HR_Induction: null,
+  HR_Resignation: null,
+  Costing_Breakup: null,
+  'Material Requisitions': 'inventory_movements',
+  'Production Orders': null,
 };
 
 const TABLE_ALIASES = {
-  vendors: ['vendors_data'],
-  stock: ['stock_data'],
-  material_inward: ['material_inward_data'],
-  material_issue: ['material_issue_data'],
-  bom: ['company_bom_data', 'bill_of_materials_data'],
-  kitting_sheet: ['company_material_issue_data'],
-  purchase_flows: ['purchase_flow_data'],
-  purchase_flow_steps: ['purchase_flow_steps_data'],
-  sales_flows: ['sales_flow_data'],
-  sales_flow_steps: ['sales_flow_steps_data'],
-  log_and_qualify_leads: ['log_and_qualify_leads_data'],
-  initial_call: ['initial_call_data'],
-  send_quotation: ['send_quotation_data'],
-  approve_payment_terms: ['approve_payment_terms_data'],
-  sample_submission: ['sample_submission_data'],
-  get_approval_for_sample: ['get_approval_for_sample_data'],
-  approve_strategic_deals: ['approve_strategic_deals_data'],
-  evaluate_high_value_prospects: ['evaluate_high_value_prospects_data'],
-  check_feasibility: ['check_feasibility_data'],
-  confirm_standard_and_compliance: ['confirm_standard_and_compliance_data'],
-  follow_up_quotations: ['follow_up_quotations_data'],
-  comparative_statement: ['comparative_statement_data'],
-  sheet_approve_quotation: ['sheet_approve_quotation_data'],
-  request_sample: ['request_sample_data'],
-  inspect_material: ['inspect_material_data'],
-  place_po: ['place_po_data'],
-  return_history: ['return_history_data'],
-  generate_grn: ['generate_grn_data'],
-  rfq: ['rfq_data'],
-  sort_vendor: ['sort_vendor_data'],
-  follow_up_delivery: ['follow_up_delivery_data'],
-  return_material: ['return_material_data'],
-  inspect_sample: ['inspect_sample_data'],
 };
 
 const tableNameCache = new Map();
@@ -162,17 +264,11 @@ function uniq(values) {
 
 export function getTableCandidateNames(tableName) {
   const primary = getTableName(tableName);
+  if (!primary) return [];
+  if (String(primary).startsWith(UNMAPPED_TABLE_PREFIX)) return [];
   const cached = tableNameCache.get(primary);
   const aliases = TABLE_ALIASES[primary] || [];
-  const derived = [];
-
-  if (primary.endsWith('_data')) {
-    derived.push(primary.slice(0, -5));
-  } else {
-    derived.push(`${primary}_data`);
-  }
-
-  return uniq([cached, primary, ...aliases, ...derived]);
+  return uniq([cached, primary, ...aliases]).filter((name) => KNOWN_SUPABASE_TABLES.has(name));
 }
 
 function rememberResolvedTableName(primary, resolvedName) {
@@ -206,7 +302,7 @@ function isPostgrestMissingTableError(error) {
   );
 }
 
-const SEND_QUOTATION_PHYSICAL = ['send_quotation', 'send_quotation_data'];
+const SEND_QUOTATION_PHYSICAL = ['send_quotation'];
 
 /**
  * Read SendQuotation rows from whichever physical table exists (migration name first).
@@ -227,7 +323,7 @@ export async function getSendQuotationRows() {
 }
 
 /**
- * Insert into send_quotation / send_quotation_data depending on project schema.
+ * Insert into send_quotation.
  */
 export async function insertSendQuotationRow(row) {
   let lastErr;
@@ -258,13 +354,13 @@ function debugGetTableRows(phase, payload) {
  */
 export function getTableName(logicalName) {
   if (!logicalName) return logicalName;
-  const resolved = TABLE_NAMES[logicalName];
-  if (resolved) return resolved;
+  if (String(logicalName).startsWith(UNMAPPED_TABLE_PREFIX)) return String(logicalName);
+  if (Object.prototype.hasOwnProperty.call(TABLE_NAMES, logicalName)) {
+    return toKnownTableName(TABLE_NAMES[logicalName], logicalName);
+  }
   // Fallback: convert to snake_case (simple)
-  return String(logicalName)
-    .replace(/\s+/g, '_')
-    .replace(/([a-z])([A-Z])/g, '$1_$2')
-    .toLowerCase();
+  const snake = toSnakeCase(logicalName);
+  return KNOWN_SUPABASE_TABLES.has(snake) ? snake : `${UNMAPPED_TABLE_PREFIX}${snake}`;
 }
 
 /**
