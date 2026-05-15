@@ -6,28 +6,46 @@ import { supabase } from './supabaseClient';
 import config from '../config/config';
 
 const KNOWN_SUPABASE_TABLES = new Set([
+  'allowed_admin_exceptions',
+  'allowed_admins',
   'approve_payment_terms',
+  'approve_payment_terms_data',
   'approve_strategic_deals',
+  'approve_strategic_deals_data',
+  'attendance_data',
   'audit_log',
   'audit_logs',
   'bom',
   'bom_templates',
   'branches',
   'check_feasibility',
+  'check_feasibility_data',
+  'client_notifications_data',
+  'client_orders_data',
+  'client_payments_data',
+  'client_quotations_data',
   'clients',
+  'clients2',
+  'company_bom_data',
+  'company_material_issue_data',
   'comparative_statement',
+  'comparative_statement_data',
   'confirm_standard_and_compliance',
   'crm_activities',
   'crm_calllogs',
   'crm_calltasks',
   'crm_communications',
+  'crm_activity_timeline',
   'crm_interactions',
   'crm_invoices',
+  'crm_leads',
   'crm_logs',
   'crm_notes',
   'crm_opportunities',
   'crm_ordertaking',
   'crm_payments',
+  'crm_quotation_items',
+  'crm_quotations',
   'crm_reminder_templates',
   'crm_tasklogs',
   'crm_tasks',
@@ -35,16 +53,29 @@ const KNOWN_SUPABASE_TABLES = new Set([
   'daily_capacity',
   'dispatches',
   'documents',
+  'document_library',
   'employees',
+  'employees_data',
   'evaluate_high_value_prospects',
+  'evaluate_high_value_prospects_data',
+  'fg_material_inward',
+  'fg_material_outward',
   'finished_goods',
+  'finance_invoices',
   'follow_up_delivery',
+  'follow_up_delivery_data',
   'follow_up_quotations',
+  'follow_up_quotations_data',
   'generate_grn',
+  'generate_grn_data',
   'get_approval_for_sample',
+  'get_approval_for_sample_data',
   'initial_call',
+  'initial_call_data',
   'inspect_material',
+  'inspect_material_data',
   'inspect_sample',
+  'inspect_sample_data',
   'inventory',
   'inventory_batches',
   'inventory_movements',
@@ -52,40 +83,70 @@ const KNOWN_SUPABASE_TABLES = new Set([
   'inventory_transactions',
   'kitting_sheet',
   'log_and_qualify_leads',
+  'log_and_qualify_leads_data',
+  'machine_schedules',
+  'machine_status_log',
   'material_approval',
+  'material_approval_data',
   'material_inward',
+  'material_inward_data',
   'material_issue',
+  'material_issue_data',
+  'mold_compatibility_matrix',
+  'notifications_data',
   'payments',
   'place_po',
+  'po_items',
   'po_import_temp',
   'po_master',
+  'power_cord_master',
+  'ppc_bom_items',
+  'ppc_material_consumption',
+  'ppc_production_plans',
+  'ppc_qc_reports',
+  'ppc_work_orders',
   'product_categories',
+  'production_monitoring',
   'products',
   'prospects_clients',
   'purchase_flow_steps',
+  'purchase_flow_steps_data',
   'purchase_flows',
+  'purchase_flow_data',
   'purchase_order_items',
   'purchase_order_steps',
   'purchase_orders',
   'release_payment',
   'request_sample',
+  'request_sample_data',
   'return_history',
   'return_material',
+  'return_material_data',
   'rfq',
+  'rfq_data',
   'roles',
   'sales_flow_steps',
+  'sales_flow_steps_data',
   'sales_flows',
+  'sales_flow_data',
   'sales_order_items',
   'sales_order_steps',
   'sales_orders',
   'sample_submission',
+  'sample_submission_data',
   'schedule_payment',
+  'schedule_payment_data',
   'send_quotation',
+  'send_quotation_data',
   'sheet_approve_quotation',
+  'sort_vendor_data',
   'sort_vendor',
   'stock',
+  'stock_data',
   'units_of_measure',
+  'user_roles',
   'users',
+  'vendors_data',
   'whatsapp_logs',
 ]);
 
@@ -126,8 +187,8 @@ export const TABLE_NAMES = {
   client_messages: 'whatsapp_logs',
 
   // Vendors & stock
-  Vendor: null,
-  vendors: null,
+  Vendor: 'vendors_data',
+  vendors: 'vendors_data',
   Stock: 'stock',
   stock: 'stock',
   'Material Inward': 'material_inward',
@@ -189,12 +250,12 @@ export const TABLE_NAMES = {
   inventory: 'inventory',
   Daily_CAPACITY: 'daily_capacity',
   daily_capacity: 'daily_capacity',
-  'Cable Products': null,
-  cable_products: null,
-  'Cable Production Plans': null,
-  cable_production_plans: null,
-  'Machine Schedules': null,
-  machine_schedules: null,
+  'Cable Products': 'cable_products',
+  cable_products: 'cable_products',
+  'Cable Production Plans': 'cable_production_plans',
+  cable_production_plans: 'cable_production_plans',
+  'Machine Schedules': 'machine_schedules',
+  machine_schedules: 'machine_schedules',
   RFQ: 'rfq',
   rfq: 'rfq',
   BOM_Templates: 'bom_templates',
@@ -244,6 +305,12 @@ export const TABLE_NAMES = {
   Delegation_Scores: 'user_scores',
   Employee_Dashboards: 'employees',
   Quotation_Formats: 'send_quotation',
+  'Company BOM': 'company_bom_data',
+  'Company Material Issues': 'company_material_issue_data',
+  'Bill of Materials': 'company_bom_data',
+  'FG Material Inward': 'fg_material_inward',
+  'FG Material Outward': 'fg_material_outward',
+  'Customer Orders': 'sales_orders',
   SCOT_Sheet: null,
   Die_Repair: null,
   HR_Induction: null,
@@ -254,6 +321,48 @@ export const TABLE_NAMES = {
 };
 
 const TABLE_ALIASES = {
+  clients: ['clients2'],
+  sales_orders: ['client_orders_data'],
+  payments: ['client_payments_data'],
+  send_quotation: ['send_quotation_data', 'client_quotations_data'],
+  crm_communications: ['client_notifications_data'],
+  employees: ['employees_data'],
+  user_scores: ['performance_data'],
+  task_instances: ['employee_tasks_data'],
+  task_audit_log: ['notifications_data'],
+  stock: ['stock_data'],
+  material_inward: ['material_inward_data'],
+  material_issue: ['material_issue_data'],
+  bom: ['company_bom_data'],
+  kitting_sheet: ['company_material_issue_data'],
+  purchase_flows: ['purchase_flow_data'],
+  purchase_flow_steps: ['purchase_flow_steps_data'],
+  sales_flows: ['sales_flow_data'],
+  sales_flow_steps: ['sales_flow_steps_data'],
+  log_and_qualify_leads: ['log_and_qualify_leads_data'],
+  initial_call: ['initial_call_data'],
+  approve_payment_terms: ['approve_payment_terms_data'],
+  sample_submission: ['sample_submission_data'],
+  get_approval_for_sample: ['get_approval_for_sample_data'],
+  approve_strategic_deals: ['approve_strategic_deals_data'],
+  evaluate_high_value_prospects: ['evaluate_high_value_prospects_data'],
+  check_feasibility: ['check_feasibility_data'],
+  follow_up_quotations: ['follow_up_quotations_data'],
+  comparative_statement: ['comparative_statement_data'],
+  sheet_approve_quotation: ['sheet_approve_quotation_data'],
+  request_sample: ['request_sample_data'],
+  inspect_material: ['inspect_material_data'],
+  material_approval: ['material_approval_data'],
+  place_po: ['po_items'],
+  generate_grn: ['generate_grn_data'],
+  schedule_payment: ['schedule_payment_data'],
+  rfq: ['rfq_data'],
+  sort_vendor: ['sort_vendor_data'],
+  follow_up_delivery: ['follow_up_delivery_data'],
+  return_material: ['return_material_data'],
+  inspect_sample: ['inspect_sample_data'],
+  inventory: ['stock_data'],
+  document_library: ['documents'],
 };
 
 const tableNameCache = new Map();
@@ -353,6 +462,19 @@ export async function insertSendQuotationRow(row) {
 
 const isDev = () => typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
 
+async function getAuthUserIdForDebug() {
+  try {
+    const { data } = await supabase.auth.getUser();
+    return data?.user?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+function logSupabaseDataDebug(payload) {
+  console.log('[supabase:data]', payload);
+}
+
 function debugGetTableRows(phase, payload) {
   if (!isDev()) return;
   console.log('[db.getTableRows]', phase, payload);
@@ -382,8 +504,16 @@ export function getTableName(logicalName) {
 export async function getTableRows(tableName) {
   const primaryName = getTableName(tableName);
   const candidateNames = getTableCandidateNames(tableName);
+  const authUserId = await getAuthUserIdForDebug();
   debugGetTableRows('invoke', { tableName, resolvedName: primaryName, candidateNames, useLocalStorage: config.useLocalStorage });
-  console.log('Using Supabase, not local storage');
+  logSupabaseDataDebug({
+    operation: 'select',
+    logicalTable: tableName,
+    resolvedTable: primaryName,
+    candidates: candidateNames,
+    query: 'select id, created_at, sort_order, record; fallback select *',
+    authUserId,
+  });
 
   let lastMissingTableError = null;
 
@@ -398,11 +528,27 @@ export async function getTableRows(tableName) {
       debugGetTableRows('primary select error', { resolvedName: name, error });
       if (isPostgrestMissingTableError(error)) {
         lastMissingTableError = error;
+        logSupabaseDataDebug({
+          operation: 'select',
+          table: name,
+          query: 'select id, created_at, sort_order, record',
+          rowCount: null,
+          authUserId,
+          error,
+        });
         continue;
       }
       // Fallback for direct-column tables (no sort_order/record wrapper)
       if (!isLegacyJsonSchemaError(error)) {
         console.error(`Error getTableRows(${name}):`, error);
+        logSupabaseDataDebug({
+          operation: 'select',
+          table: name,
+          query: 'select id, created_at, sort_order, record',
+          rowCount: null,
+          authUserId,
+          error,
+        });
         throw error;
       }
       // Legacy flat tables may omit created_at/sort_order/record — select all columns, no order.
@@ -410,19 +556,51 @@ export async function getTableRows(tableName) {
       if (directErr) {
         if (isPostgrestMissingTableError(directErr)) {
           lastMissingTableError = directErr;
+          logSupabaseDataDebug({
+            operation: 'select',
+            table: name,
+            query: 'select *',
+            rowCount: null,
+            authUserId,
+            error: directErr,
+          });
           continue;
         }
         console.error(`Error getTableRows(${name}) [direct]:`, directErr);
         debugGetTableRows('fallback select error', { resolvedName: name, error: directErr });
+        logSupabaseDataDebug({
+          operation: 'select',
+          table: name,
+          query: 'select *',
+          rowCount: null,
+          authUserId,
+          error: directErr,
+        });
         throw directErr;
       }
       rememberResolvedTableName(primaryName, name);
       debugGetTableRows('fallback success', { resolvedName: name, rowCount: (directRows || []).length });
+      logSupabaseDataDebug({
+        operation: 'select',
+        table: name,
+        query: 'select *',
+        rowCount: (directRows || []).length,
+        authUserId,
+        error: null,
+      });
       return (directRows || []).map(flattenDirectRow);
     }
 
     rememberResolvedTableName(primaryName, name);
     debugGetTableRows('success', { resolvedName: name, rowCount: (rows || []).length });
+    logSupabaseDataDebug({
+      operation: 'select',
+      table: name,
+      query: 'select id, created_at, sort_order, record',
+      rowCount: (rows || []).length,
+      authUserId,
+      error: null,
+    });
     return (rows || []).map((r) => ({
       id: r.id,
       ...(r.record || {}),
@@ -431,9 +609,25 @@ export async function getTableRows(tableName) {
 
   if (lastMissingTableError) {
     console.warn(`No Supabase table found for ${primaryName}; returning an empty list.`, lastMissingTableError);
+    logSupabaseDataDebug({
+      operation: 'select',
+      table: primaryName,
+      query: 'all candidates',
+      rowCount: 0,
+      authUserId,
+      error: lastMissingTableError,
+    });
     return [];
   }
 
+  logSupabaseDataDebug({
+    operation: 'select',
+    table: primaryName,
+    query: 'no candidates',
+    rowCount: 0,
+    authUserId,
+    error: null,
+  });
   return [];
 }
 

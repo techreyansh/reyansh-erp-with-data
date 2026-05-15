@@ -3,16 +3,30 @@ import type { Database } from '../../types/supabase';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL?.trim() || '';
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY?.trim() || '';
+const supabaseUrl =
+  process.env.REACT_APP_SUPABASE_URL?.trim() ||
+  process.env.VITE_SUPABASE_URL?.trim() ||
+  '';
+const supabaseKey =
+  process.env.REACT_APP_SUPABASE_ANON_KEY?.trim() ||
+  process.env.VITE_SUPABASE_ANON_KEY?.trim() ||
+  '';
 
 if (isDev) {
   console.log('SUPABASE URL (REACT_APP):', process.env.REACT_APP_SUPABASE_URL ?? '(undefined)');
+  console.log('SUPABASE URL (VITE):', process.env.VITE_SUPABASE_URL ?? '(undefined)');
   console.log(
     'SUPABASE KEY (REACT_APP):',
     process.env.REACT_APP_SUPABASE_ANON_KEY != null &&
       process.env.REACT_APP_SUPABASE_ANON_KEY !== ''
       ? `${String(process.env.REACT_APP_SUPABASE_ANON_KEY).slice(0, 14)}…`
+      : '(undefined)'
+  );
+  console.log(
+    'SUPABASE KEY (VITE):',
+    process.env.VITE_SUPABASE_ANON_KEY != null &&
+      process.env.VITE_SUPABASE_ANON_KEY !== ''
+      ? `${String(process.env.VITE_SUPABASE_ANON_KEY).slice(0, 14)}…`
       : '(undefined)'
   );
   console.log('SUPABASE resolved URL (used):', supabaseUrl || '(undefined — set REACT_APP_* and restart)');

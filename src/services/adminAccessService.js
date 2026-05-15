@@ -4,11 +4,25 @@
  */
 import { supabase } from '../lib/supabaseClient';
 
+function isMissingTableError(error) {
+  const message = String(error?.message || error?.details || error?.hint || '').toLowerCase();
+  return (
+    String(error?.code || '') === 'PGRST205' ||
+    message.includes('schema cache') ||
+    message.includes('could not find the table') ||
+    (message.includes('relation') && message.includes('does not exist'))
+  );
+}
+
 export async function listAllowedAdmins() {
   const { data, error } = await supabase
     .from('allowed_admins')
     .select('id, email, created_at')
     .order('created_at', { ascending: true });
+  if (isMissingTableError(error)) {
+    console.warn('[adminAccessService] allowed_admins table is not available for this Supabase project.');
+    return [];
+  }
   if (error) throw error;
   return data ?? [];
 }

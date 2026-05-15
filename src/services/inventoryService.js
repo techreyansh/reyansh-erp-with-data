@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const STOCK_TABLE = 'inventory_stock';
+const STOCK_TABLE = 'inventory';
 const RPC_UPDATE_INVENTORY = 'update_inventory_transaction';
 
 function requireId(value, label) {
