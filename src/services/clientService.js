@@ -32,8 +32,17 @@ function addDerivedClient(map, source, defaults = {}) {
     code
   );
   const key = String(code || name || '').trim();
-  if (!key || map.has(key.toUpperCase())) return;
-  map.set(key.toUpperCase(), {
+  if (!key) return;
+
+  const mapKey = key.toUpperCase();
+  const products = Array.isArray(defaults.products) ? defaults.products : [];
+  if (map.has(mapKey)) {
+    const existing = map.get(mapKey);
+    existing.Products = [...parseJsonArray(existing.Products), ...products];
+    return;
+  }
+
+  map.set(mapKey, {
     ClientName: String(name || key),
     ClientCode: String(code || key),
     BusinessType: defaults.businessType || '',
@@ -42,7 +51,7 @@ function addDerivedClient(map, source, defaults = {}) {
     State: source.State || source.state || '',
     Country: source.Country || source.country || 'India',
     Contacts: source.Contacts || source.contacts || [],
-    Products: source.Products || source.products || [],
+    Products: products.length > 0 ? products : (source.Products || source.products || []),
     Notes: defaults.notes || `Derived from ${defaults.source || 'related data'}`,
     Status: source.Status || source.status || 'Active',
   });
@@ -60,8 +69,34 @@ async function getDerivedClientsFromRelatedTables() {
 
   prospects.forEach((row) => addDerivedClient(derived, row, { source: 'prospects' }));
   customers.forEach((row) => addDerivedClient(derived, row, { source: 'customers' }));
-  products.forEach((row) => addDerivedClient(derived, row, { source: 'products' }));
-  dispatches.forEach((row) => addDerivedClient(derived, row, { source: 'dispatches' }));
+  products.forEach((row) =>
+    addDerivedClient(derived, row, {
+      source: 'products',
+      products: [
+        {
+          productCode: row.ProductCode || row.productCode || row.code || row.sku || row.id,
+          productName: row.ProductName || row.productName || row.name || row.description || row.code || row.id,
+          category: row.category || row.order_type || row.productCategory?.name || '',
+          description: row.Description || row.description || '',
+          quantity: row.quantity,
+          price: row.price,
+        },
+      ],
+    })
+  );
+  dispatches.forEach((row) =>
+    addDerivedClient(derived, row, {
+      source: 'dispatches',
+      products: [
+        {
+          productCode: row.ProductCode || row.productCode || row.code || '',
+          productName: row.ProductName || row.productName || row.name || '',
+          category: row.category || '',
+          description: row.description || '',
+        },
+      ].filter((product) => product.productCode || product.productName),
+    })
+  );
   salesFlows.forEach((row) =>
     addDerivedClient(derived, row, {
       source: 'sales flow',

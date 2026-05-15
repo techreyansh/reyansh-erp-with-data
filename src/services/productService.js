@@ -10,17 +10,22 @@ const PRODUCT_SELECT =
 function mapProductRow(row) {
   if (!row) return null;
   const { product_categories: category, units_of_measure: unit, ...rest } = row;
+  const record = rest.record || {};
   return {
+    ...record,
     id: rest.id,
     createdAt: rest.created_at,
     updatedAt: rest.updated_at,
     deletedAt: rest.deleted_at,
     name: rest.name,
     code: rest.code,
+    productName: rest.name || record.productName || record.ProductName || '',
+    productCode: rest.code || record.productCode || record.ProductCode || rest.id,
+    clientCode: record.client_code || record.clientCode || record.ClientCode || '',
     description: rest.description,
     productCategoryId: rest.product_category_id,
     unitOfMeasureId: rest.unit_of_measure_id,
-    record: rest.record || {},
+    record,
     productCategory: category
       ? {
           id: category.id,
