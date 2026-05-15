@@ -4,6 +4,75 @@ import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
 
 const CLIENTS_TABLE = 'clients';
 
+function pickFirst(...values) {
+  return values.find((value) => value != null && String(value).trim() !== '');
+}
+
+function addDerivedClient(map, source, defaults = {}) {
+  if (!source || typeof source !== 'object') return;
+  const code = pickFirst(
+    source.ClientCode,
+    source.clientCode,
+    source.client_code,
+    source.CustomerCode,
+    source.customerCode,
+    source.customer_id,
+    defaults.clientCode
+  );
+  const name = pickFirst(
+    source.ClientName,
+    source.clientName,
+    source.CompanyName,
+    source.companyName,
+    source.CustomerName,
+    source.customerName,
+    source.name,
+    source.full_name,
+    defaults.clientName,
+    code
+  );
+  const key = String(code || name || '').trim();
+  if (!key || map.has(key.toUpperCase())) return;
+  map.set(key.toUpperCase(), {
+    ClientName: String(name || key),
+    ClientCode: String(code || key),
+    BusinessType: defaults.businessType || '',
+    Address: source.Address || source.address || '',
+    City: source.City || source.city || '',
+    State: source.State || source.state || '',
+    Country: source.Country || source.country || 'India',
+    Contacts: source.Contacts || source.contacts || [],
+    Products: source.Products || source.products || [],
+    Notes: defaults.notes || `Derived from ${defaults.source || 'related data'}`,
+    Status: source.Status || source.status || 'Active',
+  });
+}
+
+async function getDerivedClientsFromRelatedTables() {
+  const derived = new Map();
+  const [products, dispatches, salesFlows, prospects, customers] = await Promise.all([
+    db.getTableRows('products').catch(() => []),
+    db.getTableRows('dispatches').catch(() => []),
+    db.getTableRows('sales_flows').catch(() => []),
+    db.getTableRows('prospects_clients').catch(() => []),
+    db.getTableRows('customers').catch(() => []),
+  ]);
+
+  prospects.forEach((row) => addDerivedClient(derived, row, { source: 'prospects' }));
+  customers.forEach((row) => addDerivedClient(derived, row, { source: 'customers' }));
+  products.forEach((row) => addDerivedClient(derived, row, { source: 'products' }));
+  dispatches.forEach((row) => addDerivedClient(derived, row, { source: 'dispatches' }));
+  salesFlows.forEach((row) =>
+    addDerivedClient(derived, row, {
+      source: 'sales flow',
+      clientCode: row.ClientCode || row.LogId || row.id,
+      clientName: row.CompanyName || row.FullName,
+    })
+  );
+
+  return Array.from(derived.values());
+}
+
 // Generate unique client code sequentially (C + 5 digits, e.g., C00001)
 export async function generateSequentialClientCode() {
   const data = await db.getTableRows(CLIENTS_TABLE).catch(() => []);
@@ -47,7 +116,11 @@ export async function getAllClients(forceRefresh = false) {
 
     console.log("[getAllClients] RAW DATA:", data);
 
-    const rows = Array.isArray(data) ? data : [];
+    let rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) {
+      rows = await getDerivedClientsFromRelatedTables();
+      console.log("[getAllClients] DERIVED DATA:", { count: rows.length });
+    }
     const mapped = rows.map((row) => ({
       ...row,
       // Basic Information

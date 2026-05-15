@@ -277,6 +277,17 @@ function rememberResolvedTableName(primary, resolvedName) {
   }
 }
 
+function flattenDirectRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const record = row.record && typeof row.record === 'object' && !Array.isArray(row.record)
+    ? row.record
+    : {};
+  return {
+    ...record,
+    ...row,
+  };
+}
+
 /** True when table is not the wrapped shape (id, sort_order, record jsonb) — use select * / direct rows. */
 function isLegacyJsonSchemaError(error) {
   if (!error) return false;
@@ -407,7 +418,7 @@ export async function getTableRows(tableName) {
       }
       rememberResolvedTableName(primaryName, name);
       debugGetTableRows('fallback success', { resolvedName: name, rowCount: (directRows || []).length });
-      return directRows || [];
+      return (directRows || []).map(flattenDirectRow);
     }
 
     rememberResolvedTableName(primaryName, name);
