@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../../types/supabase';
 
 const isDev = process.env.NODE_ENV === 'development';
+const shouldDebugSupabase = process.env.REACT_APP_SUPABASE_DEBUG === 'true' || process.env.VITE_SUPABASE_DEBUG === 'true';
 
 const supabaseUrl =
   process.env.REACT_APP_SUPABASE_URL?.trim() ||
@@ -47,6 +48,44 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
+const supabaseFetch: typeof fetch = async (input, init) => {
+  const requestUrl =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+  const method = init?.method || (typeof input !== 'string' && !(input instanceof URL) ? input.method : 'GET') || 'GET';
+  const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+  try {
+    const response = await fetch(input, init);
+    if (shouldDebugSupabase && requestUrl.includes('/rest/v1/')) {
+      const elapsedMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
+      const url = new URL(requestUrl);
+      const [, table = 'unknown'] = url.pathname.split('/rest/v1/');
+      console.log('[supabase:http]', {
+        method,
+        table: table.split('/')[0],
+        query: url.search,
+        status: response.status,
+        contentRange: response.headers.get('content-range'),
+        elapsedMs,
+      });
+    }
+    return response;
+  } catch (error) {
+    if (shouldDebugSupabase && requestUrl.includes('/rest/v1/')) {
+      console.error('[supabase:http]', {
+        method,
+        url: requestUrl,
+        error,
+      });
+    }
+    throw error;
+  }
+};
+
 /**
  * SPA OAuth (Google): PKCE + parse ?code= / hash from redirect so session is stored.
  * Without detectSessionInUrl / PKCE, INITIAL_SESSION often stays null after choosing an account.
@@ -62,6 +101,9 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
       autoRefreshToken: true,
       storage:
         typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+    global: {
+      fetch: supabaseFetch,
     },
   }
 );

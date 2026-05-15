@@ -7,5 +7,7 @@ declare namespace NodeJS {
     readonly REACT_APP_GOOGLE_OAUTH_CLIENT_ID?: string;
     readonly VITE_SUPABASE_URL?: string;
     readonly VITE_SUPABASE_ANON_KEY?: string;
+    readonly REACT_APP_SUPABASE_DEBUG?: string;
+    readonly VITE_SUPABASE_DEBUG?: string;
   }
 }
