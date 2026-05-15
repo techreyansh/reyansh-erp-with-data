@@ -2,15 +2,14 @@
  * Supabase may return OAuth errors in the query string, the hash, or both (e.g. ...#error=...&sb=).
  */
 
+export const PRODUCTION_OAUTH_REDIRECT_URL = 'https://reyansh-erp-with-data-wy3j.vercel.app';
+
 /**
  * After Google sign-in, Supabase sends the user here (app root). Must be in Supabase Redirect URLs.
- * PKCE verifier is per-origin — always use the same origin as the address bar.
+ * Production is the canonical OAuth callback so preview/local builds do not create mismatched redirects.
  */
 export function getOAuthRedirectUrl() {
-  if (typeof window === 'undefined') {
-    return 'https://reyansh-erp-with-data-wy3j.vercel.app';
-  }
-  return window.location.origin;
+  return PRODUCTION_OAUTH_REDIRECT_URL;
 }
 
 /** e.g. https://xxxx.supabase.co — for Google "Authorized JavaScript origins" */

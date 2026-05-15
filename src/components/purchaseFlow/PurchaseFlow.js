@@ -858,8 +858,6 @@ const PurchaseFlow = () => {
         console.error('Error loading flow data:', error);
         if (error.message.includes('Authentication failed') || error.response?.status === 401) {
           setError('Authentication failed. Please sign in again to access the purchase flow.');
-          // Clear any stored tokens
-          sessionStorage.removeItem('googleToken');
           // Instead of reloading, we'll let the user click a button to retry
           setShowRetryButton(true);
         } else if (error.message.includes('Sheet undefined does not exist')) {

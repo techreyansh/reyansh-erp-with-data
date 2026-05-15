@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabaseClient";
+import { getOAuthRedirectUrl } from "../../lib/oauthCallbackParams";
 
 const Login = () => {
   const theme = useTheme();
@@ -73,7 +74,7 @@ const Login = () => {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: getOAuthRedirectUrl(),
         },
       });
 
