@@ -122,8 +122,6 @@ import {
   Description,
   CloudDone,
   DeliveryDining,
-  TruckLoading,
-  Package,
   TrackChanges,
   Assessment,
   Timeline as TimelineIcon,

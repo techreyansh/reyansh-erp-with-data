@@ -476,8 +476,6 @@ export async function insertSendQuotationRow(row) {
   throw lastErr || new Error('Send quotation table not available');
 }
 
-const isDev = () => typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-
 async function getAuthUserIdForDebug() {
   try {
     const { data } = await supabase.auth.getUser();
@@ -488,12 +486,12 @@ async function getAuthUserIdForDebug() {
 }
 
 function logSupabaseDataDebug(payload) {
-  console.log('[supabase:data]', payload);
+  void payload;
 }
 
 function debugGetTableRows(phase, payload) {
-  if (!isDev()) return;
-  console.log('[db.getTableRows]', phase, payload);
+  void phase;
+  void payload;
 }
 
 /**
