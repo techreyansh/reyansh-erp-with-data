@@ -1,6 +1,19 @@
 import { supabase } from '../lib/supabaseClient';
+import { toErpCompatibleRow, toRecordPayload } from '../lib/db';
 
 const TABLE = 'purchase_orders';
+
+function mapPurchaseOrderRow(row) {
+  const normalized = toErpCompatibleRow(row);
+  return {
+    id: normalized.id,
+    createdAt: normalized.created_at,
+    updatedAt: normalized.updated_at,
+    deletedAt: normalized.deleted_at,
+    sortOrder: normalized.sort_order,
+    ...toRecordPayload(normalized),
+  };
+}
 
 /**
  * Get all purchase orders that are not soft-deleted.
@@ -9,7 +22,7 @@ const TABLE = 'purchase_orders';
 export async function getPurchaseOrders() {
   const { data, error } = await supabase
     .from(TABLE)
-    .select('id, created_at, updated_at, deleted_at, sort_order, record')
+    .select('*')
     .is('deleted_at', null)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
@@ -19,14 +32,7 @@ export async function getPurchaseOrders() {
     throw error;
   }
 
-  return (data || []).map((row) => ({
-    id: row.id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    deletedAt: row.deleted_at,
-    sortOrder: row.sort_order,
-    ...(row.record || {}),
-  }));
+  return (data || []).map(mapPurchaseOrderRow);
 }
 
 /**
@@ -42,7 +48,7 @@ export async function getPurchaseOrderById(id, options = {}) {
 
   let query = supabase
     .from(TABLE)
-    .select('id, created_at, updated_at, deleted_at, sort_order, record')
+    .select('*')
     .eq('id', id);
 
   if (!options.includeDeleted) {
@@ -58,14 +64,7 @@ export async function getPurchaseOrderById(id, options = {}) {
 
   if (!data) return null;
 
-  return {
-    id: data.id,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-    deletedAt: data.deleted_at,
-    sortOrder: data.sort_order,
-    ...(data.record || {}),
-  };
+  return mapPurchaseOrderRow(data);
 }
 
 /**
@@ -90,13 +89,7 @@ export async function createPurchaseOrder(data) {
     throw error;
   }
 
-  return {
-    id: inserted.id,
-    createdAt: inserted.created_at,
-    updatedAt: inserted.updated_at,
-    sortOrder: inserted.sort_order,
-    ...(inserted.record || {}),
-  };
+  return mapPurchaseOrderRow(inserted);
 }
 
 /**
@@ -117,7 +110,7 @@ export async function updatePurchaseOrder(id, data) {
 
   const { id: _id, createdAt, updatedAt, deletedAt, sortOrder, ...currentRecord } = existing;
   const updates = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
-  const record = { ...currentRecord, ...updates };
+  const record = toRecordPayload({ ...currentRecord, ...updates });
 
   const { data: updated, error } = await supabase
     .from(TABLE)
@@ -135,13 +128,7 @@ export async function updatePurchaseOrder(id, data) {
     throw error;
   }
 
-  return {
-    id: updated.id,
-    createdAt: updated.created_at,
-    updatedAt: updated.updated_at,
-    sortOrder: updated.sort_order,
-    ...(updated.record || {}),
-  };
+  return mapPurchaseOrderRow(updated);
 }
 
 /**

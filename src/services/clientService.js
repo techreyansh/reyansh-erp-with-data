@@ -8,6 +8,19 @@ function pickFirst(...values) {
   return values.find((value) => value != null && String(value).trim() !== '');
 }
 
+function pickField(source, ...keys) {
+  if (!source || typeof source !== 'object') return undefined;
+  return pickFirst(...keys.map((key) => source[key]));
+}
+
+function getClientCode(row) {
+  return pickField(row, 'ClientCode', 'clientCode', 'clientcode', 'client_code', 'CustomerCode', 'customerCode');
+}
+
+function getClientName(row) {
+  return pickField(row, 'ClientName', 'clientName', 'clientname', 'name', 'CompanyName', 'companyName', 'company');
+}
+
 function addDerivedClient(map, source, defaults = {}) {
   if (!source || typeof source !== 'object') return;
   const code = pickFirst(
@@ -112,7 +125,7 @@ async function getDerivedClientsFromRelatedTables() {
 export async function generateSequentialClientCode() {
   const data = await db.getTableRows(CLIENTS_TABLE).catch(() => []);
   const max = data.reduce((acc, row) => {
-    const code = row.ClientCode || '';
+    const code = getClientCode(row) || '';
     const match = code.match(/^C(\d{5})$/);
     if (match) {
       const num = parseInt(match[1], 10);
@@ -140,65 +153,60 @@ function parseClientRow(row, header) {
 
 export async function checkClientCodeExists(clientCode) {
   const data = await db.getTableRows(CLIENTS_TABLE);
-  return data.some(row => row.ClientCode === clientCode);
+  return data.some(row => getClientCode(row) === clientCode);
 }
 
 export async function getAllClients(forceRefresh = false) {
   try {
-    console.log("[getAllClients] START", { forceRefresh, table: CLIENTS_TABLE });
-
     const data = await db.getTableRows(CLIENTS_TABLE);
-
-    console.log("[getAllClients] RAW DATA:", data);
 
     let rows = Array.isArray(data) ? data : [];
     if (rows.length === 0) {
       rows = await getDerivedClientsFromRelatedTables();
-      console.log("[getAllClients] DERIVED DATA:", { count: rows.length });
     }
     const mapped = rows.map((row) => ({
+      id: row.id,
       ...row,
       // Basic Information
-      clientName: row.ClientName || '',
-      clientCode: row.ClientCode || '',
-      businessType: row.BusinessType || '',
+      clientName: getClientName(row) || '',
+      clientCode: getClientCode(row) || '',
+      businessType: pickField(row, 'BusinessType', 'businessType', 'businesstype') || '',
 
       // Contact Information
-      address: row.Address || '',
-      city: row.City || '',
-      state: row.State || '',
-      stateCode: row.StateCode || '',
-      pincode: row.Pincode || '',
-      country: row.Country || 'India',
+      address: pickField(row, 'Address', 'address') || '',
+      city: pickField(row, 'City', 'city') || '',
+      state: pickField(row, 'State', 'state') || '',
+      stateCode: pickField(row, 'StateCode', 'stateCode', 'statecode', 'state_code') || '',
+      pincode: pickField(row, 'Pincode', 'pincode') || '',
+      country: pickField(row, 'Country', 'country') || 'India',
 
       // Business Details
-      gstin: row.GSTIN || '',
-      panNumber: row.PANNumber || '',
-      accountCode: row.AccountCode || '',
-      website: row.Website || '',
+      gstin: pickField(row, 'GSTIN', 'gstin') || '',
+      panNumber: pickField(row, 'PANNumber', 'panNumber', 'pannumber', 'pan_number') || '',
+      accountCode: pickField(row, 'AccountCode', 'accountCode', 'accountcode', 'account_code') || '',
+      website: pickField(row, 'Website', 'website') || '',
 
       // Contact Management
-      contacts: parseJsonArray(row.Contacts),
+      contacts: parseJsonArray(pickField(row, 'Contacts', 'contacts')),
 
       // Business Terms
-      paymentTerms: row.PaymentTerms || '',
-      creditLimit: row.CreditLimit || '',
-      creditPeriod: row.CreditPeriod || '',
-      deliveryTerms: row.DeliveryTerms || '',
+      paymentTerms: pickField(row, 'PaymentTerms', 'paymentTerms', 'paymentterms', 'payment_terms') || '',
+      creditLimit: pickField(row, 'CreditLimit', 'creditLimit', 'creditlimit', 'credit_limit') || '',
+      creditPeriod: pickField(row, 'CreditPeriod', 'creditPeriod', 'creditperiod', 'credit_period') || '',
+      deliveryTerms: pickField(row, 'DeliveryTerms', 'deliveryTerms', 'deliveryterms', 'delivery_terms') || '',
 
       // Product Information
-      products: parseJsonArray(row.Products),
+      products: parseJsonArray(pickField(row, 'Products', 'products')),
 
       // Additional Information
-      notes: row.Notes || '',
-      status: row.Status || 'Active',
-      rating: parseInt(row.Rating, 10) || 0,
-      lastContactDate: row.LastContactDate || '',
-      totalOrders: parseInt(row.TotalOrders, 10) || 0,
-      totalValue: parseFloat(row.TotalValue) || 0,
+      notes: pickField(row, 'Notes', 'notes') || '',
+      status: pickField(row, 'Status', 'status') || 'Active',
+      rating: parseInt(pickField(row, 'Rating', 'rating'), 10) || 0,
+      lastContactDate: pickField(row, 'LastContactDate', 'lastContactDate', 'lastcontactdate', 'last_contact_date') || '',
+      totalOrders: parseInt(pickField(row, 'TotalOrders', 'totalOrders', 'totalorders', 'total_orders'), 10) || 0,
+      totalValue: parseFloat(pickField(row, 'TotalValue', 'totalValue', 'totalvalue', 'total_value')) || 0,
     }));
 
-    console.log("[getAllClients] SUCCESS", { count: mapped.length });
     return mapped;
   } catch (error) {
     console.error("[getAllClients] ERROR:", error);
@@ -265,7 +273,7 @@ export async function updateClient(client, originalClientCode = null) {
   
   const data = await db.getTableRows(CLIENTS_TABLE);
   const searchCode = originalClientCode || client.clientCode;
-  const existing = data.find(row => row.ClientCode === searchCode);
+  const existing = data.find(row => getClientCode(row) === searchCode);
   if (!existing || !existing.id) throw new Error('Client not found');
   const row = {
     // Basic Information
@@ -312,7 +320,7 @@ export async function updateClient(client, originalClientCode = null) {
 
 export async function deleteClient(clientCode) {
   const data = await db.getTableRows(CLIENTS_TABLE);
-  const row = data.find(r => r.ClientCode === clientCode);
+  const row = data.find(r => getClientCode(r) === clientCode);
   if (!row || !row.id) throw new Error('Client not found');
   await db.deleteTableRowById(CLIENTS_TABLE, row.id);
 }

@@ -126,9 +126,14 @@ export type Database = {
   };
 };
 
-/** Flattened row like getTableRows() in db.js: { id, ...record } */
+/** Flattened row like getTableRows() in db.js: { id, ...record, record } */
 export type FlattenedSheetRow<TRecord extends Record<string, Json | undefined> = Record<string, Json>> = {
   id: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  sort_order?: number;
+  record: TRecord;
 } & TRecord;
 
 /**

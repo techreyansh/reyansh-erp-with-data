@@ -366,6 +366,14 @@ const TABLE_ALIASES = {
 };
 
 const tableNameCache = new Map();
+const ROW_METADATA_KEYS = new Set([
+  'id',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'sort_order',
+  'record',
+]);
 
 function uniq(values) {
   return values.filter((value, index, array) => value && array.indexOf(value) === index);
@@ -386,15 +394,62 @@ function rememberResolvedTableName(primary, resolvedName) {
   }
 }
 
-function flattenDirectRow(row) {
+function isPlainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseRecordValue(value) {
+  if (isPlainObject(value)) return value;
+  if (typeof value !== 'string' || value.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return isPlainObject(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function hasMeaningfulValue(value) {
+  return value != null && value !== '';
+}
+
+function getFlatRecordFields(row) {
   if (!row || typeof row !== 'object') return row;
-  const record = row.record && typeof row.record === 'object' && !Array.isArray(row.record)
-    ? row.record
-    : {};
+  return Object.entries(row).reduce((acc, [key, value]) => {
+    if (!ROW_METADATA_KEYS.has(key) && value !== undefined) acc[key] = value;
+    return acc;
+  }, {});
+}
+
+function mergeRecordFields(flatFields, recordFields) {
+  const merged = { ...flatFields };
+  Object.entries(recordFields).forEach(([key, value]) => {
+    if (hasMeaningfulValue(value) || !hasMeaningfulValue(merged[key])) {
+      merged[key] = value;
+    }
+  });
+  return merged;
+}
+
+export function toErpCompatibleRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const flatFields = getFlatRecordFields(row);
+  const parsedRecord = parseRecordValue(row.record);
+  const record = mergeRecordFields(flatFields, parsedRecord);
   return {
     ...record,
-    ...row,
+    id: row.id ?? record.id,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    deleted_at: row.deleted_at,
+    sort_order: row.sort_order,
+    record,
   };
+}
+
+export function toRecordPayload(row) {
+  if (!row || typeof row !== 'object') return {};
+  return getFlatRecordFields(toErpCompatibleRow(row));
 }
 
 /** True when table is not the wrapped shape (id, sort_order, record jsonb) — use select * / direct rows. */
@@ -511,7 +566,7 @@ export async function getTableRows(tableName) {
     logicalTable: tableName,
     resolvedTable: primaryName,
     candidates: candidateNames,
-    query: 'select id, created_at, sort_order, record; fallback select *',
+    query: 'select * ordered by sort_order/created_at; fallback select *',
     authUserId,
   });
 
@@ -520,7 +575,7 @@ export async function getTableRows(tableName) {
   for (const name of candidateNames) {
     const { data: rows, error } = await supabase
       .from(name)
-      .select('id, created_at, sort_order, record')
+      .select('*')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
 
@@ -531,7 +586,7 @@ export async function getTableRows(tableName) {
         logSupabaseDataDebug({
           operation: 'select',
           table: name,
-          query: 'select id, created_at, sort_order, record',
+          query: 'select * ordered by sort_order/created_at',
           rowCount: null,
           authUserId,
           error,
@@ -544,7 +599,7 @@ export async function getTableRows(tableName) {
         logSupabaseDataDebug({
           operation: 'select',
           table: name,
-          query: 'select id, created_at, sort_order, record',
+          query: 'select * ordered by sort_order/created_at',
           rowCount: null,
           authUserId,
           error,
@@ -588,7 +643,7 @@ export async function getTableRows(tableName) {
         authUserId,
         error: null,
       });
-      return (directRows || []).map(flattenDirectRow);
+      return (directRows || []).map(toErpCompatibleRow);
     }
 
     rememberResolvedTableName(primaryName, name);
@@ -596,15 +651,12 @@ export async function getTableRows(tableName) {
     logSupabaseDataDebug({
       operation: 'select',
       table: name,
-      query: 'select id, created_at, sort_order, record',
+      query: 'select * ordered by sort_order/created_at',
       rowCount: (rows || []).length,
       authUserId,
       error: null,
     });
-    return (rows || []).map((r) => ({
-      id: r.id,
-      ...(r.record || {}),
-    }));
+    return (rows || []).map(toErpCompatibleRow);
   }
 
   if (lastMissingTableError) {
@@ -640,7 +692,7 @@ export async function getTableRows(tableName) {
 export async function insertTableRow(tableName, row) {
   const primaryName = getTableName(tableName);
   const safeRow =
-    typeof row === 'object' && row !== null && !Array.isArray(row) ? { ...row } : {};
+    typeof row === 'object' && row !== null && !Array.isArray(row) ? toRecordPayload(row) : {};
 
   let lastMissingTableError = null;
   for (const name of getTableCandidateNames(tableName)) {
@@ -718,11 +770,12 @@ export async function insertTableRow(tableName, row) {
 export async function updateTableRowById(tableName, id, row) {
   const primaryName = getTableName(tableName);
   let lastMissingTableError = null;
+  const safeRecord = toRecordPayload(row);
 
   for (const name of getTableCandidateNames(tableName)) {
     const { error } = await supabase
       .from(name)
-      .update({ record: row || {} })
+      .update({ record: safeRecord })
       .eq('id', id);
 
     if (!error) {
@@ -738,7 +791,7 @@ export async function updateTableRowById(tableName, id, row) {
       throw error;
     }
 
-    const directPayload = row && typeof row === 'object' ? row : {};
+    const directPayload = safeRecord;
     const { error: directErr } = await supabase
       .from(name)
       .update(directPayload)
@@ -796,10 +849,8 @@ export async function updateRowByIndex(tableName, rowIndex, rowData) {
   const dataIndex = rowIndex - 2;
   const row = rows[dataIndex];
   if (!row?.id) throw new Error(`Row at index ${rowIndex} not found`);
-  const existing = { ...row };
-  delete existing.id;
-  const merged = { ...existing, ...(rowData || {}) };
-  delete merged.id;
+  const existing = toRecordPayload(row);
+  const merged = toRecordPayload({ ...existing, ...(rowData || {}) });
   await updateTableRowById(tableName, row.id, merged);
 }
 
@@ -823,7 +874,7 @@ export async function deleteRowByIndex(tableName, rowIndex) {
  */
 export async function getTableHeaders(tableName) {
   const data = await getTableRows(tableName);
-  return data.length > 0 ? Object.keys(data[0]).filter((k) => k !== 'id') : [];
+  return data.length > 0 ? Object.keys(data[0]).filter((k) => !ROW_METADATA_KEYS.has(k)) : [];
 }
 
 /**
@@ -838,7 +889,7 @@ export async function batchInsertTableRows(tableName, rows) {
   const normalizeRow = (row) =>
     Array.isArray(row)
       ? Object.fromEntries(row.map((v, j) => [`col_${j}`, v]))
-      : (row && typeof row === 'object' ? row : {});
+      : (row && typeof row === 'object' ? toRecordPayload(row) : {});
 
   let lastMissingTableError = null;
 
