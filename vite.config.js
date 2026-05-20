@@ -19,7 +19,6 @@ export default defineConfig(({ mode }) => ({
     'process.env': JSON.stringify({
       NODE_ENV: mode === 'production' ? 'production' : 'development',
       PUBLIC_URL: '',
-      REACT_APP_WHATSAPP_LINK: process.env.VITE_WHATSAPP_LINK || '',
     }),
   },
 }));

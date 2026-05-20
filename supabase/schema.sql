@@ -1,7 +1,7 @@
 -- =============================================================================
 -- REYANSH ERP – SUPABASE POSTGRESQL SCHEMA
 -- Production-grade, SaaS-ready. Execute in Supabase SQL Editor.
--- After creating your own Supabase project, set REACT_APP_SUPABASE_URL to https://<your-project-ref>.supabase.co
+-- After creating your own Supabase project, set VITE_SUPABASE_URL to your project URL.
 -- =============================================================================
 -- Uses: UUID PKs, created_at/updated_at, soft delete (deleted_at), RLS, audit-ready.
 -- Auth: users table references auth.users(id). Role-based access via roles table.

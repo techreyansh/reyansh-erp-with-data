@@ -216,7 +216,7 @@ The system uses a single Google Spreadsheet with multiple sheets:
 ### 2. **OAuth Configuration**
 - **Provider**: Supabase Auth Google provider
 - **Redirect**: `window.location.origin`
-- **Environments**: Vercel Production, Preview, and Development use the same `REACT_APP_*` variables
+- **Environments**: Vercel Production, Preview, and Development use the same `VITE_*` variables
 
 ### 3. **Service Layer Architecture**
 Each business module has its own service:

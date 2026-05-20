@@ -1,6 +1,6 @@
 const config = {
   // Forced false: `db.getTableRows` and related helpers always call Supabase (never skip API).
-  // `REACT_APP_USE_LOCAL_STORAGE` is not applied here — do not re-enable via env without fixing db.js.
+  // Do not re-enable local-only data mode without fixing db.js.
   useLocalStorage: false,
 
   // Table names: logical keys mapped to Supabase table names via db.getTableName()

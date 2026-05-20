@@ -10,7 +10,7 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 |-------|------------|
 | **Application type** | Single-page application (SPA) |
 | **Frontend framework** | React 18 |
-| **Build tooling** | Create React App (react-scripts 5) |
+| **Build tooling** | Vite |
 | **Primary data source** | Google Sheets (via APIs) + session storage |
 | **Authentication** | Google OAuth 2.0 (Identity Services + Sheets/Drive scopes) |
 | **Deployment** | Static build; deployable to Vercel, Netlify, or any static host |
@@ -26,7 +26,8 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 | **React** | ^18.2.0 | UI library |
 | **React DOM** | ^18.2.0 | React renderer for the browser |
 | **react-router-dom** | ^6.22.1 | Client-side routing, nested routes, `Navigate`, `useLocation` |
-| **react-scripts** | 5.0.1 | Create React App – build, dev server, test runner, Babel, Webpack |
+| **vite** | ^8.0.13 | Dev server and production build tooling |
+| **@vitejs/plugin-react** | ^6.0.2 | React integration for Vite |
 
 ### 2.2 UI & styling
 
@@ -143,9 +144,8 @@ src/
 | Command | Purpose |
 |---------|---------|
 | **npm start** | Dev server (default port 3000) |
-| **npm run build** | Production build (`build/`) |
-| **npm test** | Jest via react-scripts |
-| **npm run eject** | Eject CRA (irreversible) |
+| **npm run build** | Production build (`dist`) |
+| **npm run preview** | Preview the production build locally |
 
 - **Browserslist:** Production/development targets in `package.json` (e.g. “>0.2%”, not dead; last Chrome/Firefox/Safari for dev).
 
@@ -160,14 +160,14 @@ src/
 | **@testing-library/user-event** | ^13.5.0 | User interaction simulation |
 | **@testing-library/dom** | ^10.4.0 | DOM utilities |
 
-- Test runner: Jest via `react-scripts test`; config extended with `react-app` / `react-app/jest` in `package.json`.
+- No test runner is currently configured after the Vite migration.
 
 ---
 
 ## 9. DevOps & deployment
 
-- **Hosting:** Static hosting (e.g. Vercel); build output is `build/`.
-- **Environment:** `REACT_APP_*` for env vars; OAuth redirect and client IDs vary by host (localhost vs Vercel).
+- **Hosting:** Static hosting (e.g. Vercel); build output is `dist`.
+- **Environment:** `VITE_*` for frontend env vars; OAuth redirect uses the active app origin.
 - **API key / secrets:** Google API key and spreadsheet ID are in `config.js` (frontend). For production, consider env-based config and restricting API key by referrer/domain.
 
 ---
@@ -183,7 +183,7 @@ src/
 | **Auth** | Google OAuth 2.0 (GIS), sessionStorage, role from Sheets or mock |
 | **Charts** | Recharts, react-google-charts |
 | **PDF/Excel** | jsPDF, jspdf-autotable, xlsx |
-| **Build** | Create React App (Webpack, Babel) |
+| **Build** | Vite |
 | **Testing** | Jest + React Testing Library |
 | **Fonts** | Plus Jakarta Sans (Google Fonts) |
 | **Deploy** | Static build → Vercel or any static host |

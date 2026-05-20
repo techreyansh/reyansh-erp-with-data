@@ -124,7 +124,7 @@ Open browser console (F12) to see debug logs when testing.
 
 ### Production Deployment:
 
-Production uses Supabase Auth Google OAuth. Ensure Vercel has the required `REACT_APP_*`
+Production uses Supabase Auth Google OAuth. Ensure Vercel has the required `VITE_*`
 environment variables in Production, Preview, and Development, and role matching will use
 the authenticated Supabase user email.
 
