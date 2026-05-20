@@ -26,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import config from '../../config/config';
 import * as db from '../../lib/db';
+import { activeSupabaseUrl } from '../../lib/supabaseClient';
 
 const SheetsTroubleshooting = () => {
   const [tokenStatus, setTokenStatus] = useState(null);
@@ -76,7 +77,7 @@ const SheetsTroubleshooting = () => {
         <Grid item xs={12} sm={6}>
           <TextField
             label="Supabase URL"
-            value={process.env.REACT_APP_SUPABASE_URL ? '✓ Set' : 'Not set'}
+            value={activeSupabaseUrl ? '✓ Set' : 'Not set'}
             fullWidth
             InputProps={{ readOnly: true }}
             variant="outlined"
@@ -86,8 +87,8 @@ const SheetsTroubleshooting = () => {
         </Grid>
         <Grid item xs={12} sm={6}>
           <TextField
-            label="Google OAuth Client ID"
-            value={process.env.REACT_APP_GOOGLE_OAUTH_CLIENT_ID ? '✓ Set' : 'Not set'}
+            label="Google OAuth"
+            value="Configured in Supabase Auth"
             fullWidth
             InputProps={{ readOnly: true }}
             variant="outlined"
@@ -170,7 +171,7 @@ const SheetsTroubleshooting = () => {
           <List dense>
             <ListItem>
               <ListItemIcon><InfoIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in .env" />
+              <ListItemText primary="Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local" />
             </ListItem>
             <ListItem>
               <ListItemIcon><InfoIcon fontSize="small" /></ListItemIcon>

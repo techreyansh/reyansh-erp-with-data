@@ -45,6 +45,26 @@ function getFlatFields(row: Record<string, unknown>): Record<string, Json> {
   }, {});
 }
 
+function getNaturalRowId(record: Record<string, Json>): string {
+  const value =
+    record.id ||
+    record.ClientCode ||
+    record.clientCode ||
+    record.clientcode ||
+    record['Vendor Code'] ||
+    record.VendorCode ||
+    record.UniqueId ||
+    record.DispatchUniqueId ||
+    record.POId ||
+    record.FlowId ||
+    record.LogId ||
+    record.EmployeeCode ||
+    record.ProductCode ||
+    record.Code ||
+    '';
+  return String(value || '');
+}
+
 function flattenRow(row: SheetEntityRow): FlattenedSheetRow {
   const source = row as unknown as Record<string, unknown>;
   const flat = getFlatFields(source);
@@ -56,7 +76,7 @@ function flattenRow(row: SheetEntityRow): FlattenedSheetRow {
   });
   return {
     ...record,
-    id: row.id,
+    id: row.id || getNaturalRowId(record),
     created_at: row.created_at,
     sort_order: row.sort_order,
     record,

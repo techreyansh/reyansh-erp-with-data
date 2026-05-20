@@ -1,19 +1,18 @@
 # Reyansh ERP (React + Supabase)
 
-Internal ERP-style web app: sales flow, purchase flow, CRM, inventory-related screens, and more. Frontend is **Create React App** (React 18); data and auth use **Supabase** (Postgres + REST + Storage).
+Internal ERP-style web app: sales flow, purchase flow, CRM, inventory-related screens, and more. Frontend is **Vite + React 18**; data and auth use **Supabase** (Postgres + REST + Storage).
 
 ## Quick start
 
 1. **Clone** this repository.
 2. **Install:** `npm ci` (or `npm install`).
 3. **Environment:** copy `.env.example` to `.env.local` and set at least:
-   - `REACT_APP_SUPABASE_URL`
-   - `REACT_APP_SUPABASE_ANON_KEY`
-   - `REACT_APP_GOOGLE_OAUTH_CLIENT_ID`
-   - Optional: `REACT_APP_WHATSAPP_LINK`
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - Optional: `VITE_WHATSAPP_LINK`
 4. **Database:** create a Supabase project and apply SQL under `supabase/migrations/` in order (or use [Supabase CLI](https://supabase.com/docs/guides/cli) `db push` against your linked project). Do not commit real keys; `.env` and `.env.local` are gitignored.
 5. **Run dev:** `npm start` → [http://localhost:3000](http://localhost:3000).
-6. **Production build:** `npm run build` → static files in `build/` (deploy to Vercel, Netlify, Cloudflare Pages, etc.; configure SPA fallback to `index.html` and the same `REACT_APP_*` vars in the host’s dashboard). The committed `.env.production` sets `DISABLE_ESLINT_PLUGIN=true` so CI builds (e.g. Vercel with `CI=true`) do not fail on legacy ESLint warnings; remove it after lint cleanup if you want strict checks in CI.
+6. **Production build:** `npm run build` → static files in `dist/` (deploy to Vercel, Netlify, Cloudflare Pages, etc.; configure SPA fallback to `index.html` and the same `VITE_*` vars in the host’s dashboard).
 
 Google sign-in is handled only by Supabase OAuth redirect:
 `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })`.
@@ -24,9 +23,9 @@ Google sign-in is handled only by Supabase OAuth redirect:
 
 ---
 
-# Getting Started with Create React App
+# Getting Started with Vite
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This project runs through [Vite](https://vite.dev/).
 
 ## Available Scripts
 

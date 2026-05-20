@@ -81,7 +81,7 @@ export async function createPurchaseOrder(data) {
       record,
       sort_order: 0,
     })
-    .select('id, created_at, updated_at, sort_order, record')
+    .select('*')
     .single();
 
   if (error) {
@@ -120,7 +120,7 @@ export async function updatePurchaseOrder(id, data) {
     })
     .eq('id', id)
     .is('deleted_at', null)
-    .select('id, created_at, updated_at, sort_order, record')
+    .select('*')
     .single();
 
   if (error) {

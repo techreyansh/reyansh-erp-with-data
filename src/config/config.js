@@ -289,7 +289,7 @@ const config = {
 
   // External links
   externalLinks: {
-    whatsapp: process.env.REACT_APP_WHATSAPP_LINK || "https://wa.me/", // WhatsApp link from environment variable
+    whatsapp: import.meta.env.VITE_WHATSAPP_LINK || "https://wa.me/",
   },
 };
 

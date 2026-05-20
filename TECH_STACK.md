@@ -106,9 +106,8 @@ Complete technology stack and architecture for the Reyansh Factory Operations Mo
 | File / env | Purpose |
 |------------|---------|
 | **src/config/config.js** | Spreadsheet ID, API key, sheet names, status codes, purchase/sales flow config, feature flags |
-| **REACT_APP_SUPABASE_URL** | Supabase project URL |
-| **REACT_APP_SUPABASE_ANON_KEY** | Supabase publishable/anon key |
-| **REACT_APP_GOOGLE_OAUTH_CLIENT_ID** | Google Web Client ID configured in the Supabase Google provider |
+| **VITE_SUPABASE_URL** | Supabase project URL |
+| **VITE_SUPABASE_ANON_KEY** | Supabase publishable/anon key |
 | **public/** | Static assets (favicon, manifest, logo, `index.html`) |
 
 ---

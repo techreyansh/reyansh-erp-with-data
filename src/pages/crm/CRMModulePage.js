@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ModuleTablePage from "../../components/common/ModuleTablePage";
 import DealsKanban from "../../components/crm/DealsKanban";
 import CRMEnterprisePanels from "../../components/crm/CRMEnterprisePanels";
-import { crmMock, crmPpcLookups } from "../../data/mock/crmPpcData";
+import { crmPpcLookups } from "../../constants/crmPpcLookups";
 import { calculateLeadScore } from "../../utils/calculations/erpCalculations";
 import { useEnterpriseERPStore } from "../../hooks/useEnterpriseERPStore";
 import crmPpcBackendService from "../../services/crmPpcBackendService";
@@ -15,10 +15,10 @@ const CRMModulePage = () => {
   const navigate = useNavigate();
   const section = location.pathname.split("/")[2] || "leads";
   const [loading, setLoading] = useState(true);
-  const [leads, setLeads] = useState(crmMock.leads);
-  const [customers, setCustomers] = useState(crmMock.customers);
-  const [followUps, setFollowUps] = useState(crmMock.followUps);
-  const [deals] = useState(crmMock.deals);
+  const [leads, setLeads] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [followUps, setFollowUps] = useState([]);
+  const [deals] = useState([]);
   const enterpriseStore = useEnterpriseERPStore({ customers });
 
   useEffect(() => {
@@ -35,10 +35,7 @@ const CRMModulePage = () => {
       ]);
       if (!mounted) return;
       setLeads(leadRows);
-      setCustomers((prev) => {
-        if (prev.length && customerRows.length === 0) return prev;
-        return customerRows;
-      });
+      setCustomers(customerRows);
     })();
     return () => {
       mounted = false;

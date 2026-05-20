@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ModuleTablePage from "../../components/common/ModuleTablePage";
 import ReportsDashboard from "../../components/ppc/ReportsDashboard";
 import PPCEnterprisePanels from "../../components/ppc/PPCEnterprisePanels";
-import { crmMock, crmPpcLookups, ppcMock } from "../../data/mock/crmPpcData";
+import { crmPpcLookups } from "../../constants/crmPpcLookups";
 import { useEnterpriseERPStore } from "../../hooks/useEnterpriseERPStore";
 import crmPpcBackendService from "../../services/crmPpcBackendService";
 import useCrmPpcRealtime from "../../hooks/useCrmPpcRealtime";
@@ -14,13 +14,18 @@ const PPCModulePage = () => {
   const navigate = useNavigate();
   const section = location.pathname.split("/")[2] || "production-plan";
   const [loading, setLoading] = useState(true);
-  const [productionPlan, setProductionPlan] = useState(ppcMock.productionPlan);
-  const [workOrders, setWorkOrders] = useState(ppcMock.workOrders);
-  const [inventory] = useState(ppcMock.inventory);
-  const [dispatch, setDispatch] = useState(ppcMock.dispatch);
-  const enterpriseStore = useEnterpriseERPStore({ productionPlan, inventory, customers: crmMock.customers });
+  const [productionPlan, setProductionPlan] = useState([]);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [inventory] = useState([]);
+  const [dispatch, setDispatch] = useState([]);
+  const enterpriseStore = useEnterpriseERPStore({ productionPlan, inventory, customers: [] });
   const { salesOrders } = enterpriseStore.state;
   const { updateRecords } = enterpriseStore;
+  const reportMetrics = {
+    productionVsTarget: [],
+    machineUtilization: [],
+    defectRate: 0,
+  };
 
   useEffect(() => {
     const handle = setTimeout(() => setLoading(false), 450);
@@ -35,8 +40,8 @@ const PPCModulePage = () => {
         crmPpcBackendService.getWorkOrders()
       ]);
       if (!mounted) return;
-      if (planRows?.length) setProductionPlan(planRows);
-      if (workOrderRows?.length) setWorkOrders(workOrderRows);
+      setProductionPlan(planRows || []);
+      setWorkOrders(workOrderRows || []);
     })();
     return () => {
       mounted = false;
@@ -46,11 +51,11 @@ const PPCModulePage = () => {
   useCrmPpcRealtime({
     onPlanChange: async () => {
       const rows = await crmPpcBackendService.getProductionPlans();
-      if (rows?.length) setProductionPlan(rows);
+      setProductionPlan(rows || []);
     },
     onWorkOrderChange: async () => {
       const rows = await crmPpcBackendService.getWorkOrders();
-      if (rows?.length) setWorkOrders(rows);
+      setWorkOrders(rows || []);
     }
   });
 
@@ -93,9 +98,7 @@ const PPCModulePage = () => {
   };
 
   const leadConversionRate = useMemo(() => {
-    const totalLeads = crmMock.leads.length;
-    const wonDeals = crmMock.deals.filter((deal) => deal.stage === "Won").length;
-    return totalLeads ? Math.round((wonDeals / totalLeads) * 100) : 0;
+    return 0;
   }, []);
 
   const config = useMemo(() => ({
@@ -203,7 +206,7 @@ const PPCModulePage = () => {
     return (
       <Container maxWidth="xl">
         <Box sx={{ py: 1 }}>
-          <ReportsDashboard reportMetrics={ppcMock.reportMetrics} leadConversionRate={leadConversionRate} />
+          <ReportsDashboard reportMetrics={reportMetrics} leadConversionRate={leadConversionRate} />
         </Box>
       </Container>
     );

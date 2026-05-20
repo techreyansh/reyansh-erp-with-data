@@ -5,6 +5,7 @@ import {
   clearOAuthCallbackFromBrowserUrl,
   googleOAuthExchangeFailureHint,
 } from '../lib/oauthCallbackParams';
+import { toErpCompatibleRow } from '../lib/db';
 
 const AuthContext = createContext();
 
@@ -30,19 +31,9 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data, error: dbError } = await supabase
         .from('users')
-        .select(
-          `
-          id,
-          email,
-          roles (
-            id,
-            name,
-            code
-          )
-        `
-        )
+        .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (dbError) {
         console.error('Role fetch error:', dbError);
@@ -50,7 +41,24 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      if (!data?.roles) {
+      const profile = toErpCompatibleRow(data || {});
+      let roleName = profile.role || profile.Role || profile.role_name || profile.roleName || null;
+      let roleCode = profile.role_code || profile.roleCode || profile.RoleCode || null;
+
+      if (!roleName && profile.role_id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('roles')
+          .select('*')
+          .eq('id', profile.role_id)
+          .maybeSingle();
+        if (!roleError && roleData) {
+          const role = toErpCompatibleRow(roleData);
+          roleName = role.name || role.Name || null;
+          roleCode = role.code || role.Code || null;
+        }
+      }
+
+      if (!roleName && !roleCode) {
         setError('Your account has no role assigned yet. Contact an administrator.');
         return;
       }
@@ -59,8 +67,8 @@ export const AuthProvider = ({ children }) => {
         prev && prev.id === userId
           ? {
               ...prev,
-              role: data.roles?.name ?? null,
-              roleCode: data.roles?.code ?? null,
+              role: roleName,
+              roleCode,
             }
           : prev
       );
@@ -81,7 +89,6 @@ export const AuthProvider = ({ children }) => {
       if (session?.user) break;
       await new Promise((r) => setTimeout(r, 80));
     }
-    console.log('SESSION (sync):', session);
     if (session?.user) {
       setUser(mapSessionToUser(session.user));
       void enrichRole(session.user.id);
@@ -95,7 +102,6 @@ export const AuthProvider = ({ children }) => {
     let mounted = true;
 
     const applySession = (session) => {
-      console.log('SESSION:', session);
       const u = session?.user ? mapSessionToUser(session.user) : null;
       setUser(u);
       if (u?.id) {
@@ -141,7 +147,6 @@ export const AuthProvider = ({ children }) => {
           if (session?.user) break;
           await new Promise((r) => setTimeout(r, 100));
         }
-        console.log('SESSION:', session);
         if (!mounted) return;
         if (session) {
           applySession(session);
@@ -152,8 +157,6 @@ export const AuthProvider = ({ children }) => {
     })();
 
     const { data: listenerData } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('AUTH EVENT:', event, session);
-      console.log('SESSION:', session);
       if (!mounted) return;
       if (event === 'TOKEN_REFRESHED') return;
       if (event === 'INITIAL_SESSION') {

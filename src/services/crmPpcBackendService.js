@@ -1,46 +1,46 @@
 import { supabase } from "../lib/supabaseClient";
-import { crmMock, ppcMock } from "../data/mock/crmPpcData";
+import { toErpCompatibleRow } from "../lib/db";
 
 const mapLead = (row) => ({
   id: row.id,
-  companyName: row.company_name,
-  contactPerson: row.contact_person,
-  phone: row.phone,
-  email: row.email,
-  source: row.source,
-  status: row.status,
-  assignedTo: row.assigned_to,
-  score: row.score ?? 0,
-  budgetScore: row.budget_score ?? 0,
-  requirementClarityScore: row.requirement_clarity_score ?? 0,
-  urgencyScore: row.urgency_score ?? 0,
-  engagementScore: row.engagement_score ?? 0,
-  decisionAuthorityScore: row.decision_authority_score ?? 0,
-  createdDate: row.created_at?.slice(0, 10) || ""
+  companyName: row.company_name || row.companyName || row.CompanyName || row.name || "",
+  contactPerson: row.contact_person || row.contactPerson || row.ContactPerson || "",
+  phone: row.phone || row.Phone || "",
+  email: row.email || row.Email || "",
+  source: row.source || row.Source || "",
+  status: row.status || row.Status || "",
+  assignedTo: row.assigned_to || row.assignedTo || row.AssignedTo || "",
+  score: row.score ?? row.Score ?? 0,
+  budgetScore: row.budget_score ?? row.budgetScore ?? 0,
+  requirementClarityScore: row.requirement_clarity_score ?? row.requirementClarityScore ?? 0,
+  urgencyScore: row.urgency_score ?? row.urgencyScore ?? 0,
+  engagementScore: row.engagement_score ?? row.engagementScore ?? 0,
+  decisionAuthorityScore: row.decision_authority_score ?? row.decisionAuthorityScore ?? 0,
+  createdDate: row.created_at?.slice(0, 10) || row.createdDate || ""
 });
 
 const mapCustomer = (row) => ({
   id: row.id,
-  companyName: row.company_name || row.name,
-  gstNumber: row.gstin || "",
-  contactPerson: row.contact_person || "",
-  phone: row.phone || "",
-  email: row.email || "",
-  creditLimit: Number(row.credit_limit || 0),
-  outstandingAmount: Number(row.outstanding_amount || 0),
-  overdueDays: Number(row.overdue_days || 0),
-  createdDate: row.created_at?.slice(0, 10) || ""
+  companyName: row.company_name || row.companyName || row.CompanyName || row.name || row.Name || "",
+  gstNumber: row.gstin || row.GSTIN || "",
+  contactPerson: row.contact_person || row.contactPerson || row.ContactPerson || "",
+  phone: row.phone || row.Phone || "",
+  email: row.email || row.Email || "",
+  creditLimit: Number(row.credit_limit || row.creditLimit || row.CreditLimit || 0),
+  outstandingAmount: Number(row.outstanding_amount || row.outstandingAmount || row.OutstandingAmount || 0),
+  overdueDays: Number(row.overdue_days || row.overdueDays || row.OverdueDays || 0),
+  createdDate: row.created_at?.slice(0, 10) || row.createdDate || ""
 });
 
 const mapProductionPlan = (row) => ({
   id: row.id,
-  salesOrderId: row.sales_order_id,
-  productType: row.products?.name || row.product_id,
-  productId: row.product_id,
-  quantity: Number(row.quantity || 0),
-  startDate: row.start_date,
-  endDate: row.end_date,
-  status: row.status
+  salesOrderId: row.sales_order_id || row.salesOrderId || row.SalesOrderId || row.SOId || "",
+  productType: row.product_name || row.productType || row.ProductName || row.product_id || "",
+  productId: row.product_id || row.productId || row.ProductId || "",
+  quantity: Number(row.quantity || row.Quantity || 0),
+  startDate: row.start_date || row.startDate || row.StartDate || "",
+  endDate: row.end_date || row.endDate || row.EndDate || "",
+  status: row.status || row.Status || ""
 });
 
 const mapWorkOrder = (row) => ({
@@ -53,25 +53,22 @@ const mapWorkOrder = (row) => ({
   defects: Number(row.defects || 0)
 });
 
-const safe = async (fn, fallback) => {
-  try {
-    return await fn();
-  } catch (error) {
-    console.warn("[crmPpcBackendService] fallback to mock data:", error?.message || error);
-    return fallback;
+const readRows = async (tableName, orderColumn = "created_at") => {
+  let query = supabase.from(tableName).select("*");
+  if (orderColumn) query = query.order(orderColumn, { ascending: false });
+  const { data, error } = await query;
+  if (error && String(error.message || "").includes(orderColumn)) {
+    const fallback = await supabase.from(tableName).select("*");
+    if (fallback.error) throw fallback.error;
+    return (fallback.data || []).map(toErpCompatibleRow);
   }
+  if (error) throw error;
+  return (data || []).map(toErpCompatibleRow);
 };
 
 export const crmPpcBackendService = {
   async getLeads() {
-    return safe(async () => {
-      const { data, error } = await supabase
-        .from("crm_leads")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data || []).map(mapLead);
-    }, crmMock.leads);
+    return (await readRows("crm_leads")).map(mapLead);
   },
 
   async upsertLead(lead) {
@@ -105,14 +102,7 @@ export const crmPpcBackendService = {
   },
 
   async getCustomers() {
-    return safe(async () => {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("id, name, company_name, gstin, contact_person, phone, email, credit_limit, outstanding_amount, overdue_days, created_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data || []).map(mapCustomer);
-    }, crmMock.customers);
+    return (await readRows("customers")).map(mapCustomer);
   },
 
   async upsertCustomer(customer) {
@@ -134,14 +124,7 @@ export const crmPpcBackendService = {
   },
 
   async getProductionPlans() {
-    return safe(async () => {
-      const { data, error } = await supabase
-        .from("ppc_production_plans")
-        .select("id, sales_order_id, product_id, quantity, start_date, end_date, status, products(name)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data || []).map(mapProductionPlan);
-    }, ppcMock.productionPlan);
+    return (await readRows("ppc_production_plans")).map(mapProductionPlan);
   },
 
   async upsertProductionPlan(plan) {
@@ -157,18 +140,14 @@ export const crmPpcBackendService = {
     const { data, error } = await supabase
       .from("ppc_production_plans")
       .upsert(payload)
-      .select("id, sales_order_id, product_id, quantity, start_date, end_date, status, products(name)")
+      .select("*")
       .single();
     if (error) throw error;
     return mapProductionPlan(data);
   },
 
   async getWorkOrders() {
-    return safe(async () => {
-      const { data, error } = await supabase.from("ppc_work_orders").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data || []).map(mapWorkOrder);
-    }, ppcMock.workOrders);
+    return (await readRows("ppc_work_orders")).map(mapWorkOrder);
   },
 
   subscribe(table, onEvent) {

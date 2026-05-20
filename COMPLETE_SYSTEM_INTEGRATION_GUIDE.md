@@ -249,7 +249,7 @@ npm run build
 4. Add the production Vercel URL to Supabase Redirect URLs
 
 ### 3. **OAuth Configuration**
-- Set `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`, and `REACT_APP_GOOGLE_OAUTH_CLIENT_ID`
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 - Configure these variables in Vercel for Production, Preview, and Development
 
 ### 4. **Sheet Initialization**
