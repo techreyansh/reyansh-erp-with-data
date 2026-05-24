@@ -4,6 +4,7 @@
  */
 import { supabase } from './supabaseClient';
 import config from '../config/config';
+import { logErpDebug } from './erpDebug';
 
 const KNOWN_SUPABASE_TABLES = new Set([
   'allowed_admin_exceptions',
@@ -224,14 +225,14 @@ export const TABLE_NAMES = {
   // HR / admin custom data tables
   Employees: 'employees_data',
   employees: 'employees_data',
-  Performance: 'user_scores',
-  performance: 'user_scores',
+  Performance: 'performance_data',
+  performance: 'performance_data',
   Attendance: 'attendance_data',
   attendance: 'attendance_data',
-  EmployeeTasks: 'task_instances',
-  employee_tasks: 'task_instances',
-  Notifications: 'task_audit_log',
-  notifications: 'task_audit_log',
+  EmployeeTasks: 'employee_tasks_data',
+  employee_tasks: 'employee_tasks_data',
+  Notifications: 'notifications_data',
+  notifications: 'notifications_data',
 
   // CRM / payment reminder tables
   CRM_Opportunities: 'crm_quotations',
@@ -486,12 +487,11 @@ async function getAuthUserIdForDebug() {
 }
 
 function logSupabaseDataDebug(payload) {
-  void payload;
+  logErpDebug('TABLE_QUERY', payload);
 }
 
 function debugGetTableRows(phase, payload) {
-  void phase;
-  void payload;
+  logErpDebug(`DB_GET_ROWS_${phase}`, payload);
 }
 
 /**

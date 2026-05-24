@@ -33,14 +33,18 @@ const mapCustomer = (row) => ({
 });
 
 const mapProductionPlan = (row) => ({
-  id: row.id,
-  salesOrderId: row.sales_order_id || row.salesOrderId || row.SalesOrderId || row.SOId || "",
-  productType: row.product_name || row.productType || row.ProductName || row.product_id || "",
-  productId: row.product_id || row.productId || row.ProductId || "",
+  id: row.planId || row.id,
+  salesOrderId: row.sales_order_id || row.salesOrderId || row.SalesOrderId || row.SOId || row.orderNumber || "",
+  productType: row.product_name || row.productType || row.ProductName || row.productName || row.productCode || row.product_id || "",
+  productId: row.product_id || row.productId || row.ProductId || row.productCode || "",
   quantity: Number(row.quantity || row.Quantity || 0),
-  startDate: row.start_date || row.startDate || row.StartDate || "",
-  endDate: row.end_date || row.endDate || row.EndDate || "",
-  status: row.status || row.Status || ""
+  startDate: row.start_date || row.startDate || row.StartDate || row.estimatedStartDate || row.createdDate || "",
+  endDate: row.end_date || row.endDate || row.EndDate || row.estimatedCompletionDate || row.dueDate || "",
+  status: row.status || row.Status || "",
+  specification: row.specification || row.productName || row.productCode || "",
+  rawMaterialRequired: row.rawMaterialRequired || row.materialRequirements || "",
+  machineAllocation: row.machineAllocation || row.machineAllocated || "",
+  priority: row.priority || row.Priority || "",
 });
 
 const mapWorkOrder = (row) => ({
@@ -64,6 +68,16 @@ const readRows = async (tableName, orderColumn = "created_at") => {
   }
   if (error) throw error;
   return (data || []).map(toErpCompatibleRow);
+};
+
+const readFirstNonEmpty = async (tableNames) => {
+  let lastRows = [];
+  for (const tableName of tableNames) {
+    const rows = await readRows(tableName).catch(() => []);
+    if (rows.length > 0) return rows;
+    lastRows = rows;
+  }
+  return lastRows;
 };
 
 export const crmPpcBackendService = {
@@ -124,7 +138,7 @@ export const crmPpcBackendService = {
   },
 
   async getProductionPlans() {
-    return (await readRows("ppc_production_plans")).map(mapProductionPlan);
+    return (await readFirstNonEmpty(["ppc_production_plans", "cable_production_plans"])).map(mapProductionPlan);
   },
 
   async upsertProductionPlan(plan) {

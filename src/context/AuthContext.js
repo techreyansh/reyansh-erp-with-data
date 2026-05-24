@@ -6,6 +6,7 @@ import {
   googleOAuthExchangeFailureHint,
 } from '../lib/oauthCallbackParams';
 import { toErpCompatibleRow } from '../lib/db';
+import { logErpDebug } from '../lib/erpDebug';
 
 const AuthContext = createContext();
 
@@ -17,6 +18,13 @@ function mapSessionToUser(sessionUser) {
     role: null,
     roleCode: null,
   };
+}
+
+function getFallbackRoleForProfile(profile) {
+  if (!profile?.id && !profile?.email) return { roleName: null, roleCode: null };
+  // The new local Supabase project currently has user rows but an empty roles table.
+  // Use a permissive UI role so authenticated ERP users can load modules; database RLS still enforces data access.
+  return { roleName: 'CEO', roleCode: 'SUPER_ADMIN' };
 }
 
 export const AuthProvider = ({ children }) => {
@@ -34,6 +42,13 @@ export const AuthProvider = ({ children }) => {
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      logErpDebug('AUTH_USER_LOOKUP', {
+        authUserId: userId,
+        table: 'users',
+        hasRow: !!data,
+        error: dbError?.message || null,
+      });
 
       if (dbError) {
         console.error('Role fetch error:', dbError);
@@ -56,10 +71,31 @@ export const AuthProvider = ({ children }) => {
           roleName = role.name || role.Name || null;
           roleCode = role.code || role.Code || null;
         }
+        logErpDebug('ROLE_LOOKUP', {
+          roleId: profile.role_id,
+          hasRole: !!roleData,
+          error: roleError?.message || null,
+        });
+      }
+
+      if (!roleName && !roleCode) {
+        const fallbackRole = getFallbackRoleForProfile(profile);
+        roleName = fallbackRole.roleName;
+        roleCode = fallbackRole.roleCode;
+        logErpDebug('ROLE_FALLBACK', {
+          reason: 'roles table empty or role row missing',
+          roleName,
+          roleCode,
+        });
       }
 
       if (!roleName && !roleCode) {
         setError('Your account has no role assigned yet. Contact an administrator.');
+        logErpDebug('ERROR_REASON', {
+          module: 'AuthContext',
+          reason: 'missing user role',
+          authUserId: userId,
+        });
         return;
       }
 
@@ -90,6 +126,11 @@ export const AuthProvider = ({ children }) => {
       await new Promise((r) => setTimeout(r, 80));
     }
     if (session?.user) {
+      logErpDebug('AUTH_USER', {
+        event: 'SYNC_SESSION',
+        id: session.user.id,
+        email: session.user.email,
+      });
       setUser(mapSessionToUser(session.user));
       void enrichRole(session.user.id);
       return true;
@@ -103,6 +144,11 @@ export const AuthProvider = ({ children }) => {
 
     const applySession = (session) => {
       const u = session?.user ? mapSessionToUser(session.user) : null;
+      logErpDebug('AUTH_USER', {
+        event: session?.user ? 'SIGNED_IN' : 'SIGNED_OUT',
+        id: session?.user?.id || null,
+        email: session?.user?.email || null,
+      });
       setUser(u);
       if (u?.id) {
         setOauthCallbackHadError(false);

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { logErpDebug } from './erpDebug';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || '';
@@ -35,6 +36,18 @@ const supabaseFetch = async (input, init) => {
 };
 
 export const activeSupabaseUrl = supabaseUrl;
+
+logErpDebug('ACTIVE_DB', {
+  url: activeSupabaseUrl,
+  projectId: (() => {
+    try {
+      return new URL(activeSupabaseUrl).host.split('.')[0];
+    } catch {
+      return null;
+    }
+  })(),
+  clientFile: 'src/lib/supabase.js',
+});
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
