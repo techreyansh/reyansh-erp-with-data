@@ -1,20 +1,20 @@
+import { activeSupabaseUrl } from './supabaseClient';
+
 /**
  * Supabase may return OAuth errors in the query string, the hash, or both (e.g. ...#error=...&sb=).
  */
 
-export const PRODUCTION_OAUTH_REDIRECT_URL = 'https://reyansh-erp-with-data-wy3j.vercel.app';
-
 /**
  * After Google sign-in, Supabase sends the user here (app root). Must be in Supabase Redirect URLs.
- * Production is the canonical OAuth callback so preview/local builds do not create mismatched redirects.
  */
 export function getOAuthRedirectUrl() {
-  return PRODUCTION_OAUTH_REDIRECT_URL;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return '';
 }
 
-/** e.g. https://xxxx.supabase.co — for Google "Authorized JavaScript origins" */
+/** Supabase project origin for Google "Authorized JavaScript origins". */
 export function getSupabaseProjectOrigin() {
-  const raw = process.env.REACT_APP_SUPABASE_URL?.trim();
+  const raw = activeSupabaseUrl;
   if (!raw) return null;
   try {
     return new URL(raw.startsWith('http') ? raw : `https://${raw}`).origin;
@@ -24,13 +24,13 @@ export function getSupabaseProjectOrigin() {
 }
 
 export function getSupabaseGoogleRedirectCallbackUrl() {
-  const raw = process.env.REACT_APP_SUPABASE_URL?.trim();
-  if (!raw) return 'https://<your-project-ref>.supabase.co/auth/v1/callback';
+  const raw = activeSupabaseUrl;
+  if (!raw) return '(Supabase URL not configured)';
   try {
     const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
     return `${u.origin}/auth/v1/callback`;
   } catch {
-    return 'https://<your-project-ref>.supabase.co/auth/v1/callback';
+    return '(Supabase URL not configured)';
   }
 }
 
@@ -83,14 +83,10 @@ export function googleOAuthExchangeFailureHint() {
   return [
     '',
     'This app uses Google sign-in through Supabase OAuth redirect only.',
-    'Vercel environment variables must be set for Production, Preview, and Development:',
-    '  REACT_APP_SUPABASE_URL=https://pkwnkfxlhuwnhxbbftmf.supabase.co',
-    '  REACT_APP_SUPABASE_ANON_KEY=<publishable key>',
-    '  REACT_APP_GOOGLE_OAUTH_CLIENT_ID=<Google Web Client ID used by Supabase>',
+    'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for every deployment environment.',
     '',
     'Supabase Dashboard → Authentication → URL Configuration → Redirect URLs must include:',
     `  ${appOrigin}`,
-    '  https://reyansh-erp-with-data-wy3j.vercel.app',
     '',
     'Google Cloud → Web client → Authorized redirect URIs must include the Supabase callback:',
     `   ${supabaseCallback}`,

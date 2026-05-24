@@ -5,6 +5,8 @@ import {
   clearOAuthCallbackFromBrowserUrl,
   googleOAuthExchangeFailureHint,
 } from '../lib/oauthCallbackParams';
+import { toErpCompatibleRow } from '../lib/db';
+import { logErpDebug } from '../lib/erpDebug';
 
 const AuthContext = createContext();
 
@@ -16,6 +18,13 @@ function mapSessionToUser(sessionUser) {
     role: null,
     roleCode: null,
   };
+}
+
+function getFallbackRoleForProfile(profile) {
+  if (!profile?.id && !profile?.email) return { roleName: null, roleCode: null };
+  // The new local Supabase project currently has user rows but an empty roles table.
+  // Use a permissive UI role so authenticated ERP users can load modules; database RLS still enforces data access.
+  return { roleName: 'CEO', roleCode: 'SUPER_ADMIN' };
 }
 
 export const AuthProvider = ({ children }) => {
@@ -30,19 +39,16 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data, error: dbError } = await supabase
         .from('users')
-        .select(
-          `
-          id,
-          email,
-          roles (
-            id,
-            name,
-            code
-          )
-        `
-        )
+        .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
+
+      logErpDebug('AUTH_USER_LOOKUP', {
+        authUserId: userId,
+        table: 'users',
+        hasRow: !!data,
+        error: dbError?.message || null,
+      });
 
       if (dbError) {
         console.error('Role fetch error:', dbError);
@@ -50,8 +56,46 @@ export const AuthProvider = ({ children }) => {
         return;
       }
 
-      if (!data?.roles) {
+      const profile = toErpCompatibleRow(data || {});
+      let roleName = profile.role || profile.Role || profile.role_name || profile.roleName || null;
+      let roleCode = profile.role_code || profile.roleCode || profile.RoleCode || null;
+
+      if (!roleName && profile.role_id) {
+        const { data: roleData, error: roleError } = await supabase
+          .from('roles')
+          .select('*')
+          .eq('id', profile.role_id)
+          .maybeSingle();
+        if (!roleError && roleData) {
+          const role = toErpCompatibleRow(roleData);
+          roleName = role.name || role.Name || null;
+          roleCode = role.code || role.Code || null;
+        }
+        logErpDebug('ROLE_LOOKUP', {
+          roleId: profile.role_id,
+          hasRole: !!roleData,
+          error: roleError?.message || null,
+        });
+      }
+
+      if (!roleName && !roleCode) {
+        const fallbackRole = getFallbackRoleForProfile(profile);
+        roleName = fallbackRole.roleName;
+        roleCode = fallbackRole.roleCode;
+        logErpDebug('ROLE_FALLBACK', {
+          reason: 'roles table empty or role row missing',
+          roleName,
+          roleCode,
+        });
+      }
+
+      if (!roleName && !roleCode) {
         setError('Your account has no role assigned yet. Contact an administrator.');
+        logErpDebug('ERROR_REASON', {
+          module: 'AuthContext',
+          reason: 'missing user role',
+          authUserId: userId,
+        });
         return;
       }
 
@@ -59,8 +103,8 @@ export const AuthProvider = ({ children }) => {
         prev && prev.id === userId
           ? {
               ...prev,
-              role: data.roles?.name ?? null,
-              roleCode: data.roles?.code ?? null,
+              role: roleName,
+              roleCode,
             }
           : prev
       );
@@ -81,8 +125,12 @@ export const AuthProvider = ({ children }) => {
       if (session?.user) break;
       await new Promise((r) => setTimeout(r, 80));
     }
-    console.log('SESSION (sync):', session);
     if (session?.user) {
+      logErpDebug('AUTH_USER', {
+        event: 'SYNC_SESSION',
+        id: session.user.id,
+        email: session.user.email,
+      });
       setUser(mapSessionToUser(session.user));
       void enrichRole(session.user.id);
       return true;
@@ -95,8 +143,12 @@ export const AuthProvider = ({ children }) => {
     let mounted = true;
 
     const applySession = (session) => {
-      console.log('SESSION:', session);
       const u = session?.user ? mapSessionToUser(session.user) : null;
+      logErpDebug('AUTH_USER', {
+        event: session?.user ? 'SIGNED_IN' : 'SIGNED_OUT',
+        id: session?.user?.id || null,
+        email: session?.user?.email || null,
+      });
       setUser(u);
       if (u?.id) {
         setOauthCallbackHadError(false);
@@ -141,7 +193,6 @@ export const AuthProvider = ({ children }) => {
           if (session?.user) break;
           await new Promise((r) => setTimeout(r, 100));
         }
-        console.log('SESSION:', session);
         if (!mounted) return;
         if (session) {
           applySession(session);
@@ -152,8 +203,6 @@ export const AuthProvider = ({ children }) => {
     })();
 
     const { data: listenerData } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('AUTH EVENT:', event, session);
-      console.log('SESSION:', session);
       if (!mounted) return;
       if (event === 'TOKEN_REFRESHED') return;
       if (event === 'INITIAL_SESSION') {

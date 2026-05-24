@@ -43,22 +43,11 @@ function normalizeClientRow(row) {
     return { id: "", clientname: null, city: null, state: null, gstin: null };
   }
 
-  if (row.clientName != null || row.clientCode != null) {
-    return {
-      id: row.id ?? row.clientCode ?? "",
-      clientname: row.clientName ?? row.ClientName,
-      city: row.city ?? row.City,
-      state: row.state ?? row.State,
-      gstin: row.gstin ?? row.GSTIN,
-    };
-  }
-
   const rec =
     row.record && typeof row.record === "object" && !Array.isArray(row.record)
       ? row.record
       : {};
   const src = { ...rec, ...row };
-
   const pick = (...keys) => {
     for (let i = 0; i < keys.length; i += 1) {
       const k = keys[i];
@@ -67,6 +56,16 @@ function normalizeClientRow(row) {
     }
     return null;
   };
+
+  if (row.clientName != null || row.clientCode != null) {
+    return {
+      id: row.id ?? pick("clientCode", "ClientCode", "clientcode") ?? "",
+      clientname: pick("clientName", "ClientName", "clientname", "name", "company"),
+      city: pick("city", "City"),
+      state: pick("state", "State"),
+      gstin: pick("gstin", "GSTIN", "Gstin"),
+    };
+  }
 
   return {
     id: row.id ?? pick("id") ?? "",
@@ -91,16 +90,12 @@ const Dashboard = () => {
   useEffect(() => {
     let cancelled = false;
 
-    console.log("FETCH STARTED");
-
     setFetchLoading(true);
     setFetchError(null);
 
     getAllClients()
       .then((data) => {
         if (cancelled) return;
-        console.log("FETCH SUCCESS");
-        console.log("Dashboard clients payload:", data);
         setClients(Array.isArray(data) ? data : []);
       })
       .catch((err) => {

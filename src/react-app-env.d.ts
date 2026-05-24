@@ -1,13 +1,13 @@
-/// <reference types="react-scripts" />
+/// <reference types="vite/client" />
 
-declare namespace NodeJS {
-  interface ProcessEnv {
-    readonly REACT_APP_SUPABASE_URL?: string;
-    readonly REACT_APP_SUPABASE_ANON_KEY?: string;
-    readonly REACT_APP_GOOGLE_OAUTH_CLIENT_ID?: string;
+interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL?: string;
     readonly VITE_SUPABASE_ANON_KEY?: string;
-    readonly REACT_APP_SUPABASE_DEBUG?: string;
     readonly VITE_SUPABASE_DEBUG?: string;
-  }
+    readonly VITE_ERP_DEBUG?: string;
+    readonly VITE_WHATSAPP_LINK?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }

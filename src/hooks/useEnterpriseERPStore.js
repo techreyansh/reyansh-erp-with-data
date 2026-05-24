@@ -1,16 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { enterpriseInitialState } from "../data/mock/enterpriseMockData";
 import { calculateMachineUtilization, calculateMRPShortages, evaluateCreditRisk } from "../utils/calculations/erpCalculations";
 
 const STORE_KEY = "erp-enterprise-store-v1";
+const emptyEnterpriseState = {
+  userRole: "User",
+  leadActivities: [],
+  quotations: [],
+  salesOrders: [],
+  payments: [],
+  openIssues: [],
+  documents: [],
+  bom: [],
+  machines: [],
+  routingSteps: [],
+  productionTracking: [],
+  qualityChecks: [],
+  scrapTracking: [],
+  dispatchLogistics: [],
+  productionCosting: [],
+  savedViews: [],
+};
 
 export const useEnterpriseERPStore = ({ productionPlan = [], inventory = [], customers = [] }) => {
   const [state, setState] = useState(() => {
     try {
       const stored = window.localStorage.getItem(STORE_KEY);
-      return stored ? JSON.parse(stored) : enterpriseInitialState;
+      return stored ? { ...emptyEnterpriseState, ...JSON.parse(stored) } : emptyEnterpriseState;
     } catch (error) {
-      return enterpriseInitialState;
+      return emptyEnterpriseState;
     }
   });
 

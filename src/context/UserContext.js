@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useCallback, useContext } fr
 import { useAuth } from './AuthContext';
 import * as db from '../lib/db';
 import config from '../config/config';
+import { logErpDebug } from '../lib/erpDebug';
 
 const UserContext = createContext(null);
 
@@ -38,6 +39,13 @@ export const UserProvider = ({ children }) => {
       const tableName = db.getTableName(config.sheets?.users) || 'users';
       const rows = await db.getTableRows(tableName);
       const match = rows.find((u) => (u.Email ?? u.email ?? '').toString().toLowerCase() === email.toLowerCase());
+      logErpDebug('USER_PROFILE_LOOKUP', {
+        module: 'UserContext',
+        tableName,
+        email,
+        rowCount: rows.length,
+        found: !!match,
+      });
       if (match) {
         setProfile({ id: match.id, ...match });
       } else {
@@ -45,6 +53,11 @@ export const UserProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('UserContext: failed to fetch user profile', err);
+      logErpDebug('ERROR_REASON', {
+        module: 'UserContext',
+        reason: err?.message || String(err),
+        email,
+      });
       setProfileError(err);
       setProfile(null);
     } finally {

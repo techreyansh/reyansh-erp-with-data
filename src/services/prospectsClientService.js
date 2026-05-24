@@ -4,10 +4,28 @@ import { parseJsonArray } from '../utils/parseJsonField';
 import { sheetInt, sheetFloat } from '../utils/sheetNumbers';
 
 // Generate unique client code (PC + 4 digits starting from PC0001 for Prospects Clients)
+function pickFirst(...values) {
+  return values.find((value) => value != null && String(value).trim() !== '');
+}
+
+function pickField(source, ...keys) {
+  if (!source || typeof source !== 'object') return undefined;
+  return pickFirst(...keys.map((key) => source[key]));
+}
+
+function getClientCode(row) {
+  return pickField(row, 'ClientCode', 'clientCode', 'clientcode', 'client_code');
+}
+
+function getClientName(row) {
+  return pickField(row, 'ClientName', 'clientName', 'clientname', 'name', 'CompanyName', 'companyName', 'company');
+}
+
 async function generateClientCode() {
   const data = await db.getTableRows(db.getTableName(config.sheets.prospectsClients));
   const max = data.reduce((acc, row) => {
-    const match = row.ClientCode && row.ClientCode.match(/^PC(\d{4})$/);
+    const code = getClientCode(row);
+    const match = code && code.match(/^PC(\d{4})$/);
     if (match) {
       const num = parseInt(match[1], 10);
       return num > acc ? num : acc;
@@ -20,51 +38,53 @@ async function generateClientCode() {
 
 export async function checkClientCodeExists(clientCode) {
   const data = await db.getTableRows(db.getTableName(config.sheets.prospectsClients));
-  return data.some(row => row.ClientCode === clientCode);
+  return data.some(row => getClientCode(row) === clientCode);
 }
 
 export async function getAllClients(forceRefresh = false) {
   const data = await db.getTableRows(db.getTableName(config.sheets.prospectsClients));
   // data is array of objects with keys from header
   return data.map(row => ({
+    id: row.id,
+    ...row,
     // Basic Information
-    clientName: row.ClientName || '',
-    clientCode: row.ClientCode || '',
-    businessType: row.BusinessType || '',
+    clientName: getClientName(row) || '',
+    clientCode: getClientCode(row) || '',
+    businessType: pickField(row, 'BusinessType', 'businessType', 'businesstype') || '',
     
     // Contact Information
-    address: row.Address || '',
-    city: row.City || '',
-    state: row.State || '',
-    stateCode: row.StateCode || '',
-    pincode: row.Pincode || '',
-    country: row.Country || 'India',
+    address: pickField(row, 'Address', 'address') || '',
+    city: pickField(row, 'City', 'city') || '',
+    state: pickField(row, 'State', 'state') || '',
+    stateCode: pickField(row, 'StateCode', 'stateCode', 'statecode', 'state_code') || '',
+    pincode: pickField(row, 'Pincode', 'pincode') || '',
+    country: pickField(row, 'Country', 'country') || 'India',
     
     // Business Details
-    gstin: row.GSTIN || '',
-    panNumber: row.PANNumber || '',
-    accountCode: row.AccountCode || '',
-    website: row.Website || '',
+    gstin: pickField(row, 'GSTIN', 'gstin') || '',
+    panNumber: pickField(row, 'PANNumber', 'panNumber', 'pannumber', 'pan_number') || '',
+    accountCode: pickField(row, 'AccountCode', 'accountCode', 'accountcode', 'account_code') || '',
+    website: pickField(row, 'Website', 'website') || '',
     
     // Contact Management
-    contacts: parseJsonArray(row.Contacts),
+    contacts: parseJsonArray(pickField(row, 'Contacts', 'contacts')),
     
     // Business Terms
-    paymentTerms: row.PaymentTerms || '',
-    creditLimit: row.CreditLimit || '',
-    creditPeriod: row.CreditPeriod || '',
-    deliveryTerms: row.DeliveryTerms || '',
+    paymentTerms: pickField(row, 'PaymentTerms', 'paymentTerms', 'paymentterms', 'payment_terms') || '',
+    creditLimit: pickField(row, 'CreditLimit', 'creditLimit', 'creditlimit', 'credit_limit') || '',
+    creditPeriod: pickField(row, 'CreditPeriod', 'creditPeriod', 'creditperiod', 'credit_period') || '',
+    deliveryTerms: pickField(row, 'DeliveryTerms', 'deliveryTerms', 'deliveryterms', 'delivery_terms') || '',
     
     // Product Information
-    products: parseJsonArray(row.Products),
+    products: parseJsonArray(pickField(row, 'Products', 'products')),
     
     // Additional Information
-    notes: row.Notes || '',
-    status: row.Status || 'Active',
-    rating: parseInt(row.Rating) || 0,
-    lastContactDate: row.LastContactDate || '',
-    totalOrders: parseInt(row.TotalOrders) || 0,
-    totalValue: parseFloat(row.TotalValue) || 0
+    notes: pickField(row, 'Notes', 'notes') || '',
+    status: pickField(row, 'Status', 'status') || 'Active',
+    rating: parseInt(pickField(row, 'Rating', 'rating'), 10) || 0,
+    lastContactDate: pickField(row, 'LastContactDate', 'lastContactDate', 'lastcontactdate', 'last_contact_date') || '',
+    totalOrders: parseInt(pickField(row, 'TotalOrders', 'totalOrders', 'totalorders', 'total_orders'), 10) || 0,
+    totalValue: parseFloat(pickField(row, 'TotalValue', 'totalValue', 'totalvalue', 'total_value')) || 0
   }));
 }
 
@@ -128,7 +148,7 @@ export async function updateClient(client, originalClientCode = null) {
   // Find the row index by original client code (if provided) or current client code
   const data = await db.getTableRows(db.getTableName(config.sheets.prospectsClients));
   const searchCode = originalClientCode || client.clientCode;
-  const idx = data.findIndex(row => row.ClientCode === searchCode);
+  const idx = data.findIndex(row => getClientCode(row) === searchCode);
   if (idx === -1) throw new Error('Client not found');
   const row = {
     // Basic Information
@@ -177,7 +197,7 @@ export async function updateClient(client, originalClientCode = null) {
 export async function deleteClient(clientCode) {
   // Find the row index by clientCode
   const data = await db.getTableRows(db.getTableName(config.sheets.prospectsClients));
-  const idx = data.findIndex(row => row.ClientCode === clientCode);
+  const idx = data.findIndex(row => getClientCode(row) === clientCode);
   if (idx === -1) throw new Error('Client not found');
   
   // Delete the row from the sheet

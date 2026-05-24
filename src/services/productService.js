@@ -4,13 +4,12 @@ const PRODUCTS_TABLE = 'products';
 const CATEGORIES_TABLE = 'product_categories';
 const UNITS_TABLE = 'units_of_measure';
 
-const PRODUCT_SELECT =
-  'id, created_at, updated_at, deleted_at, name, code, description, product_category_id, unit_of_measure_id, record, product_categories(id, name, slug, description), units_of_measure(id, code, name, symbol)';
+const PRODUCT_SELECT = '*';
 
 function mapProductRow(row) {
   if (!row) return null;
   const { product_categories: category, units_of_measure: unit, ...rest } = row;
-  const record = rest.record || {};
+  const record = rest.record && typeof rest.record === 'object' && !Array.isArray(rest.record) ? rest.record : {};
   return {
     ...record,
     id: rest.id,
@@ -29,7 +28,7 @@ function mapProductRow(row) {
     productCategory: category
       ? {
           id: category.id,
-          name: category.name,
+              name: category.name,
           slug: category.slug,
           description: category.description,
         }
@@ -256,7 +255,7 @@ export async function getProductCategories() {
   try {
     const { data, error } = await supabase
       .from(CATEGORIES_TABLE)
-      .select('id, name, slug, description')
+      .select('*')
       .is('deleted_at', null)
       .order('name', { ascending: true });
 
@@ -280,7 +279,7 @@ export async function getUnitsOfMeasure() {
   try {
     const { data, error } = await supabase
       .from(UNITS_TABLE)
-      .select('id, code, name, symbol')
+      .select('*')
       .is('deleted_at', null)
       .order('code', { ascending: true });
 

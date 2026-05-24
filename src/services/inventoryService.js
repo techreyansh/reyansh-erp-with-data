@@ -32,9 +32,7 @@ export async function getInventoryByBranch(branch_id) {
   try {
     const { data, error } = await supabase
       .from(STOCK_TABLE)
-      .select(
-        'branch_id, product_id, quantity, updated_at, products(id, name, code, description, unit_of_measure_id, units_of_measure(id, code, name, symbol))'
-      )
+      .select('*')
       .eq('branch_id', branch_id)
       .order('product_id', { ascending: true });
 
@@ -43,10 +41,10 @@ export async function getInventoryByBranch(branch_id) {
     return (data || []).map((row) => {
       const p = row.products;
       return {
-        branchId: row.branch_id,
-        productId: row.product_id,
+        branchId: row.branch_id || row.branchId || row.BranchId,
+        productId: row.product_id || row.productId || row.ProductId,
         quantity: Number(row.quantity),
-        updatedAt: row.updated_at,
+        updatedAt: row.updated_at || row.updatedAt || row.UpdatedAt,
         product: p
           ? {
               id: p.id,
@@ -83,17 +81,17 @@ export async function getStockByProduct(product_id) {
   try {
     const { data, error } = await supabase
       .from(STOCK_TABLE)
-      .select('branch_id, product_id, quantity, updated_at')
+      .select('*')
       .eq('product_id', product_id)
       .order('branch_id', { ascending: true });
 
     if (error) handleError('getStockByProduct', { product_id }, error);
 
     return (data || []).map((row) => ({
-      branchId: row.branch_id,
-      productId: row.product_id,
+      branchId: row.branch_id || row.branchId || row.BranchId,
+      productId: row.product_id || row.productId || row.ProductId,
       quantity: Number(row.quantity),
-      updatedAt: row.updated_at,
+      updatedAt: row.updated_at || row.updatedAt || row.UpdatedAt,
     }));
   } catch (err) {
     if (err.code === 'VALIDATION_ERROR') throw err;

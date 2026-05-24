@@ -1,103 +1,62 @@
 /**
- * Supabase table access: one table per entity (no sheet_rows / sheet_name).
- * All tables have: id, created_at, sort_order, record jsonb.
+ * Supabase table access: one table per ERP entity with compatibility for
+ * flat tables and sheet-style `record` jsonb tables.
  */
 import { supabase } from './supabaseClient';
 import config from '../config/config';
+import { logErpDebug } from './erpDebug';
 
 const KNOWN_SUPABASE_TABLES = new Set([
   'allowed_admin_exceptions',
   'allowed_admins',
-  'approve_payment_terms',
   'approve_payment_terms_data',
-  'approve_strategic_deals',
   'approve_strategic_deals_data',
   'attendance_data',
   'audit_log',
-  'audit_logs',
-  'bom',
-  'bom_templates',
   'branches',
-  'check_feasibility',
+  'cable_production_plans',
+  'cable_products',
   'check_feasibility_data',
   'client_notifications_data',
   'client_orders_data',
   'client_payments_data',
   'client_quotations_data',
-  'clients',
   'clients2',
   'company_bom_data',
   'company_material_issue_data',
-  'comparative_statement',
   'comparative_statement_data',
   'confirm_standard_and_compliance',
-  'crm_activities',
-  'crm_calllogs',
-  'crm_calltasks',
-  'crm_communications',
+  'costing_data',
   'crm_activity_timeline',
-  'crm_interactions',
-  'crm_invoices',
   'crm_leads',
-  'crm_logs',
-  'crm_notes',
-  'crm_opportunities',
-  'crm_ordertaking',
-  'crm_payments',
   'crm_quotation_items',
   'crm_quotations',
-  'crm_reminder_templates',
-  'crm_tasklogs',
-  'crm_tasks',
   'customers',
-  'daily_capacity',
   'dispatches',
-  'documents',
   'document_library',
-  'employees',
+  'employee_tasks_data',
   'employees_data',
-  'evaluate_high_value_prospects',
   'evaluate_high_value_prospects_data',
   'fg_material_inward',
   'fg_material_outward',
-  'finished_goods',
   'finance_invoices',
-  'follow_up_delivery',
   'follow_up_delivery_data',
-  'follow_up_quotations',
   'follow_up_quotations_data',
-  'generate_grn',
   'generate_grn_data',
-  'get_approval_for_sample',
   'get_approval_for_sample_data',
-  'initial_call',
   'initial_call_data',
-  'inspect_material',
   'inspect_material_data',
-  'inspect_sample',
   'inspect_sample_data',
   'inventory',
-  'inventory_batches',
-  'inventory_movements',
-  'inventory_stock',
-  'inventory_transactions',
-  'kitting_sheet',
-  'log_and_qualify_leads',
   'log_and_qualify_leads_data',
   'machine_schedules',
   'machine_status_log',
-  'material_approval',
   'material_approval_data',
-  'material_inward',
   'material_inward_data',
-  'material_issue',
   'material_issue_data',
   'mold_compatibility_matrix',
   'notifications_data',
-  'payments',
-  'place_po',
   'po_items',
-  'po_import_temp',
   'po_master',
   'power_cord_master',
   'ppc_bom_items',
@@ -109,45 +68,31 @@ const KNOWN_SUPABASE_TABLES = new Set([
   'production_monitoring',
   'products',
   'prospects_clients',
-  'purchase_flow_steps',
-  'purchase_flow_steps_data',
-  'purchase_flows',
   'purchase_flow_data',
-  'purchase_order_items',
-  'purchase_order_steps',
-  'purchase_orders',
-  'release_payment',
-  'request_sample',
+  'purchase_flow_steps_data',
   'request_sample_data',
-  'return_history',
-  'return_material',
   'return_material_data',
-  'rfq',
   'rfq_data',
   'roles',
-  'sales_flow_steps',
-  'sales_flow_steps_data',
-  'sales_flows',
   'sales_flow_data',
+  'sales_flow_steps_data',
   'sales_order_items',
-  'sales_order_steps',
   'sales_orders',
-  'sample_submission',
   'sample_submission_data',
-  'schedule_payment',
   'schedule_payment_data',
-  'send_quotation',
   'send_quotation_data',
-  'sheet_approve_quotation',
   'sort_vendor_data',
-  'sort_vendor',
-  'stock',
   'stock_data',
+  'task_audit_log',
+  'task_instances',
+  'task_legacy_import',
+  'task_submissions',
+  'task_templates',
   'units_of_measure',
   'user_roles',
+  'user_scores',
   'users',
   'vendors_data',
-  'whatsapp_logs',
 ]);
 
 const UNMAPPED_TABLE_PREFIX = '__unmapped__:';
@@ -169,77 +114,84 @@ export const TABLE_NAMES = {
   // Auth & users
   Users: 'users',
   users: 'users',
+  Metrics: 'costing_data',
+  metrics: 'costing_data',
 
-  // Clients — canonical migration table is public.clients.
-  CLIENT: 'clients',
-  clients: 'clients',
+  // Clients — new rebuild uses public.clients2 as the ERP client table.
+  CLIENT: 'clients2',
+  clients: 'clients2',
   PROSPECTS_CLIENTS: 'prospects_clients',
   prospects_clients: 'prospects_clients',
-  Client_Orders: 'sales_orders',
-  client_orders: 'sales_orders',
-  Client_Payments: 'payments',
-  client_payments: 'payments',
-  Client_Quotations: 'send_quotation',
-  client_quotations: 'send_quotation',
-  Client_Notifications: 'crm_communications',
-  client_notifications: 'crm_communications',
-  Client_Messages: 'whatsapp_logs',
-  client_messages: 'whatsapp_logs',
+  Client_Orders: 'client_orders_data',
+  client_orders: 'client_orders_data',
+  Client_Payments: 'client_payments_data',
+  client_payments: 'client_payments_data',
+  Client_Quotations: 'client_quotations_data',
+  client_quotations: 'client_quotations_data',
+  Client_Notifications: 'client_notifications_data',
+  client_notifications: 'client_notifications_data',
 
   // Vendors & stock
   Vendor: 'vendors_data',
+  Vendors: 'vendors_data',
   vendors: 'vendors_data',
-  Stock: 'stock',
-  stock: 'stock',
-  'Material Inward': 'material_inward',
-  'Material Issue': 'material_issue',
-  BOM: 'bom',
-  'Kitting Sheet': 'kitting_sheet',
-  'Finished Goods': 'finished_goods',
+  Stock: 'stock_data',
+  stock: 'stock_data',
+  'Material Inward': 'material_inward_data',
+  'Material Issue': 'material_issue_data',
+  BOM: 'company_bom_data',
+  'Kitting Sheet': 'company_material_issue_data',
+  'Finished Goods': 'fg_material_inward',
 
   // Dispatches
   Dispatches: 'dispatches',
   dispatches: 'dispatches',
 
   // Purchase flow
-  Purchase_Flow: 'purchase_flows',
-  PurchaseFlow: 'purchase_flows',
-  purchase_flows: 'purchase_flows',
-  PurchaseFlowSteps: 'purchase_flow_steps',
-  purchase_flow_steps: 'purchase_flow_steps',
+  Purchase_Flow: 'purchase_flow_data',
+  PurchaseFlow: 'purchase_flow_data',
+  purchase_flows: 'purchase_flow_data',
+  purchase_flow_data: 'purchase_flow_data',
+  PurchaseFlowSteps: 'purchase_flow_steps_data',
+  purchase_flow_steps: 'purchase_flow_steps_data',
+  purchase_flow_steps_data: 'purchase_flow_steps_data',
+  PurchaseFlowDocuments: 'document_library',
+  PurchaseFlowVendors: 'vendors_data',
+  PurchaseFlowApprovals: 'task_instances',
+  PurchaseFlowPayments: 'client_payments_data',
 
   // Sales flow
-  SalesFlow: 'sales_flows',
-  sales_flows: 'sales_flows',
-  SalesFlowSteps: 'sales_flow_steps',
-  sales_flow_steps: 'sales_flow_steps',
-  LogAndQualifyLeads: 'log_and_qualify_leads',
-  InitialCall: 'initial_call',
-  SendQuotation: 'send_quotation',
-  ApprovePaymentTerms: 'approve_payment_terms',
-  SampleSubmission: 'sample_submission',
-  GetApprovalForSample: 'get_approval_for_sample',
-  ApproveStrategicDeals: 'approve_strategic_deals',
-  EvaluateHighValueProspects: 'evaluate_high_value_prospects',
-  CheckFeasibility: 'check_feasibility',
+  SalesFlow: 'sales_flow_data',
+  sales_flows: 'sales_flow_data',
+  sales_flow_data: 'sales_flow_data',
+  SalesFlowSteps: 'sales_flow_steps_data',
+  sales_flow_steps: 'sales_flow_steps_data',
+  sales_flow_steps_data: 'sales_flow_steps_data',
+  LogAndQualifyLeads: 'log_and_qualify_leads_data',
+  InitialCall: 'initial_call_data',
+  SendQuotation: 'send_quotation_data',
+  ApprovePaymentTerms: 'approve_payment_terms_data',
+  SampleSubmission: 'sample_submission_data',
+  GetApprovalForSample: 'get_approval_for_sample_data',
+  ApproveStrategicDeals: 'approve_strategic_deals_data',
+  EvaluateHighValueProspects: 'evaluate_high_value_prospects_data',
+  CheckFeasibility: 'check_feasibility_data',
   ConfirmStandardAndCompliance: 'confirm_standard_and_compliance',
-  FollowUpQuotations: 'follow_up_quotations',
-  'Comparative Statement': 'comparative_statement',
-  SheetApproveQuotation: 'sheet_approve_quotation',
-  RequestSample: 'request_sample',
-  InspectMaterial: 'inspect_material',
-  MaterialApproval: 'material_approval',
-  PlacePO: 'place_po',
-  ReturnHistory: 'return_history',
-  GenerateGRN: 'generate_grn',
-  SchedulePayment: 'schedule_payment',
-  ReleasePayment: 'release_payment',
+  FollowUpQuotations: 'follow_up_quotations_data',
+  'Comparative Statement': 'comparative_statement_data',
+  SheetApproveQuotation: 'comparative_statement_data',
+  RequestSample: 'request_sample_data',
+  InspectMaterial: 'inspect_material_data',
+  MaterialApproval: 'material_approval_data',
+  PlacePO: 'po_items',
+  ReturnHistory: 'return_material_data',
+  GenerateGRN: 'generate_grn_data',
+  SchedulePayment: 'schedule_payment_data',
+  ReleasePayment: 'schedule_payment_data',
 
   // Logs & products
   Audit_Log: 'audit_log',
   audit_log: 'audit_log',
-  'WhatsApp Message Logs': 'whatsapp_logs',
-  whatsapp_logs: 'whatsapp_logs',
   PRODUCT: 'products',
   products: 'products',
   PO_Master: 'po_master',
@@ -248,124 +200,103 @@ export const TABLE_NAMES = {
   so_master: 'sales_orders',
   Inventory: 'inventory',
   inventory: 'inventory',
-  Daily_CAPACITY: 'daily_capacity',
-  daily_capacity: 'daily_capacity',
+  inventory_data: 'inventory',
+  Daily_CAPACITY: 'dispatches',
+  daily_capacity: 'dispatches',
   'Cable Products': 'cable_products',
   cable_products: 'cable_products',
   'Cable Production Plans': 'cable_production_plans',
   cable_production_plans: 'cable_production_plans',
   'Machine Schedules': 'machine_schedules',
   machine_schedules: 'machine_schedules',
-  RFQ: 'rfq',
-  rfq: 'rfq',
-  BOM_Templates: 'bom_templates',
-  bom_templates: 'bom_templates',
-  SortVendor: 'sort_vendor',
-  sort_vendor: 'sort_vendor',
-  FollowUpDelivery: 'follow_up_delivery',
-  follow_up_delivery: 'follow_up_delivery',
-  ReturnMaterial: 'return_material',
-  return_material: 'return_material',
-  InspectSample: 'inspect_sample',
-  inspect_sample: 'inspect_sample',
+  RFQ: 'rfq_data',
+  rfq: 'rfq_data',
+  BOM_Templates: 'company_bom_data',
+  bom_templates: 'company_bom_data',
+  SortVendor: 'sort_vendor_data',
+  sort_vendor: 'sort_vendor_data',
+  FollowUpDelivery: 'follow_up_delivery_data',
+  follow_up_delivery: 'follow_up_delivery_data',
+  ReturnMaterial: 'return_material_data',
+  return_material: 'return_material_data',
+  InspectSample: 'inspect_sample_data',
+  inspect_sample: 'inspect_sample_data',
 
   // HR / admin custom data tables
-  Employees: 'employees',
-  employees: 'employees',
-  Performance: 'user_scores',
-  performance: 'user_scores',
-  Attendance: null,
-  attendance: null,
-  EmployeeTasks: 'task_instances',
-  employee_tasks: 'task_instances',
-  Notifications: 'task_audit_log',
-  notifications: 'task_audit_log',
+  Employees: 'employees_data',
+  employees: 'employees_data',
+  Performance: 'performance_data',
+  performance: 'performance_data',
+  Attendance: 'attendance_data',
+  attendance: 'attendance_data',
+  EmployeeTasks: 'employee_tasks_data',
+  employee_tasks: 'employee_tasks_data',
+  Notifications: 'notifications_data',
+  notifications: 'notifications_data',
 
   // CRM / payment reminder tables
-  CRM_Opportunities: 'crm_opportunities',
-  CRM_Activities: 'crm_activities',
-  CRM_Interactions: 'crm_interactions',
-  CRM_Tasks: 'crm_tasks',
-  CRM_Notes: 'crm_notes',
-  CRM_OrderTaking: 'crm_ordertaking',
-  CRM_CallLogs: 'crm_calllogs',
-  CRM_Payments: 'crm_payments',
-  CRM_Invoices: 'crm_invoices',
-  CRM_ReminderTemplates: 'crm_reminder_templates',
-  CRM_Communications: 'crm_communications',
-  CRM_CallTasks: 'crm_calltasks',
-  CRM_TaskLogs: 'crm_tasklogs',
-  Petty_Cash: 'payments',
-  Enquiries: 'crm_logs',
-  Enquiries_Export: 'crm_logs',
-  Enquiries_IndiaMart: 'crm_logs',
+  CRM_Opportunities: 'crm_quotations',
+  CRM_Activities: 'crm_activity_timeline',
+  CRM_Interactions: 'crm_activity_timeline',
+  CRM_Tasks: 'task_instances',
+  CRM_Notes: 'crm_activity_timeline',
+  CRM_OrderTaking: 'sales_orders',
+  CRM_CallLogs: 'crm_activity_timeline',
+  CRM_Payments: 'client_payments_data',
+  CRM_Invoices: 'finance_invoices',
+  CRM_ReminderTemplates: 'client_notifications_data',
+  CRM_Communications: 'client_notifications_data',
+  CRM_CallTasks: 'task_instances',
+  CRM_TaskLogs: 'task_audit_log',
+  Petty_Cash: 'client_payments_data',
+  Enquiries: 'crm_leads',
+  Enquiries_Export: 'crm_leads',
+  Enquiries_IndiaMart: 'crm_leads',
   Checklists: 'task_templates',
   Delegation: 'task_instances',
   MIS_Scores: 'user_scores',
   Delegation_Scores: 'user_scores',
-  Employee_Dashboards: 'employees',
-  Quotation_Formats: 'send_quotation',
+  Employee_Dashboards: 'employees_data',
+  Quotation_Formats: 'send_quotation_data',
   'Company BOM': 'company_bom_data',
   'Company Material Issues': 'company_material_issue_data',
   'Bill of Materials': 'company_bom_data',
   'FG Material Inward': 'fg_material_inward',
   'FG Material Outward': 'fg_material_outward',
+  'FG Stock': 'stock_data',
+  'FG Billing': 'sales_orders',
   'Customer Orders': 'sales_orders',
-  SCOT_Sheet: null,
-  Die_Repair: null,
-  HR_Induction: null,
-  HR_Resignation: null,
-  Costing_Breakup: null,
-  'Material Requisitions': 'inventory_movements',
-  'Production Orders': null,
+  SCOT_Sheet: 'task_instances',
+  Die_Repair: 'task_instances',
+  HR_Induction: 'task_instances',
+  HR_Resignation: 'task_instances',
+  Costing: 'costing_data',
+  Costing_Breakup: 'costing_data',
+  'Material Requisitions': 'inventory',
+  'Production Orders': 'ppc_production_plans',
 };
 
 const TABLE_ALIASES = {
-  clients: ['clients2'],
+  clients2: ['prospects_clients'],
   sales_orders: ['client_orders_data'],
-  payments: ['client_payments_data'],
-  send_quotation: ['send_quotation_data', 'client_quotations_data'],
-  crm_communications: ['client_notifications_data'],
-  employees: ['employees_data'],
-  user_scores: ['performance_data'],
+  send_quotation_data: ['client_quotations_data'],
   task_instances: ['employee_tasks_data'],
   task_audit_log: ['notifications_data'],
-  stock: ['stock_data'],
-  material_inward: ['material_inward_data'],
-  material_issue: ['material_issue_data'],
-  bom: ['company_bom_data'],
-  kitting_sheet: ['company_material_issue_data'],
-  purchase_flows: ['purchase_flow_data'],
-  purchase_flow_steps: ['purchase_flow_steps_data'],
-  sales_flows: ['sales_flow_data'],
-  sales_flow_steps: ['sales_flow_steps_data'],
-  log_and_qualify_leads: ['log_and_qualify_leads_data'],
-  initial_call: ['initial_call_data'],
-  approve_payment_terms: ['approve_payment_terms_data'],
-  sample_submission: ['sample_submission_data'],
-  get_approval_for_sample: ['get_approval_for_sample_data'],
-  approve_strategic_deals: ['approve_strategic_deals_data'],
-  evaluate_high_value_prospects: ['evaluate_high_value_prospects_data'],
-  check_feasibility: ['check_feasibility_data'],
-  follow_up_quotations: ['follow_up_quotations_data'],
-  comparative_statement: ['comparative_statement_data'],
-  sheet_approve_quotation: ['sheet_approve_quotation_data'],
-  request_sample: ['request_sample_data'],
-  inspect_material: ['inspect_material_data'],
-  material_approval: ['material_approval_data'],
-  place_po: ['po_items'],
-  generate_grn: ['generate_grn_data'],
-  schedule_payment: ['schedule_payment_data'],
-  rfq: ['rfq_data'],
-  sort_vendor: ['sort_vendor_data'],
-  follow_up_delivery: ['follow_up_delivery_data'],
-  return_material: ['return_material_data'],
-  inspect_sample: ['inspect_sample_data'],
-  inventory: ['stock_data'],
-  document_library: ['documents'],
+  stock_data: ['inventory'],
+  company_bom_data: ['ppc_bom_items'],
+  schedule_payment_data: ['client_payments_data'],
+  document_library: [],
 };
 
 const tableNameCache = new Map();
+const ROW_METADATA_KEYS = new Set([
+  'id',
+  'created_at',
+  'updated_at',
+  'deleted_at',
+  'sort_order',
+  'record',
+]);
 
 function uniq(values) {
   return values.filter((value, index, array) => value && array.indexOf(value) === index);
@@ -386,15 +317,101 @@ function rememberResolvedTableName(primary, resolvedName) {
   }
 }
 
-function flattenDirectRow(row) {
+function isPlainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseRecordValue(value) {
+  if (isPlainObject(value)) return value;
+  if (typeof value !== 'string' || value.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return isPlainObject(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function hasMeaningfulValue(value) {
+  return value != null && value !== '';
+}
+
+function getFlatRecordFields(row) {
   if (!row || typeof row !== 'object') return row;
-  const record = row.record && typeof row.record === 'object' && !Array.isArray(row.record)
-    ? row.record
-    : {};
+  return Object.entries(row).reduce((acc, [key, value]) => {
+    if (!ROW_METADATA_KEYS.has(key) && value !== undefined) acc[key] = value;
+    return acc;
+  }, {});
+}
+
+function mergeRecordFields(flatFields, recordFields) {
+  const merged = { ...flatFields };
+  Object.entries(recordFields).forEach(([key, value]) => {
+    if (hasMeaningfulValue(value) || !hasMeaningfulValue(merged[key])) {
+      merged[key] = value;
+    }
+  });
+  return merged;
+}
+
+function getNaturalRowId(record) {
+  return (
+    record.id ||
+    record.ClientCode ||
+    record.clientCode ||
+    record.clientcode ||
+    record['Vendor Code'] ||
+    record.VendorCode ||
+    record.UniqueId ||
+    record.DispatchUniqueId ||
+    record.POId ||
+    record.FlowId ||
+    record.LogId ||
+    record.EmployeeCode ||
+    record.ProductCode ||
+    record.Code ||
+    null
+  );
+}
+
+function getNaturalKeyColumns(row, id) {
+  if (!row || typeof row !== 'object' || id == null) return [];
+  return [
+    'ClientCode',
+    'clientCode',
+    'clientcode',
+    'Vendor Code',
+    'VendorCode',
+    'UniqueId',
+    'DispatchUniqueId',
+    'POId',
+    'FlowId',
+    'LogId',
+    'EmployeeCode',
+    'ProductCode',
+    'Code',
+  ].filter((key, index, keys) => row[key] === id && keys.indexOf(key) === index);
+}
+
+export function toErpCompatibleRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const flatFields = getFlatRecordFields(row);
+  const parsedRecord = parseRecordValue(row.record);
+  const record = mergeRecordFields(flatFields, parsedRecord);
   return {
     ...record,
-    ...row,
+    id: row.id ?? getNaturalRowId(record),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    deleted_at: row.deleted_at,
+    sort_order: row.sort_order,
+    record,
   };
+}
+
+export function toRecordPayload(row) {
+  if (!row || typeof row !== 'object') return {};
+  return getFlatRecordFields(toErpCompatibleRow(row));
 }
 
 /** True when table is not the wrapped shape (id, sort_order, record jsonb) — use select * / direct rows. */
@@ -422,7 +439,7 @@ function isPostgrestMissingTableError(error) {
   );
 }
 
-const SEND_QUOTATION_PHYSICAL = ['send_quotation'];
+const SEND_QUOTATION_PHYSICAL = ['send_quotation_data', 'client_quotations_data'];
 
 /**
  * Read SendQuotation rows from whichever physical table exists (migration name first).
@@ -443,7 +460,7 @@ export async function getSendQuotationRows() {
 }
 
 /**
- * Insert into send_quotation.
+ * Insert into the active send quotation table.
  */
 export async function insertSendQuotationRow(row) {
   let lastErr;
@@ -460,8 +477,6 @@ export async function insertSendQuotationRow(row) {
   throw lastErr || new Error('Send quotation table not available');
 }
 
-const isDev = () => typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-
 async function getAuthUserIdForDebug() {
   try {
     const { data } = await supabase.auth.getUser();
@@ -472,12 +487,11 @@ async function getAuthUserIdForDebug() {
 }
 
 function logSupabaseDataDebug(payload) {
-  console.log('[supabase:data]', payload);
+  logErpDebug('TABLE_QUERY', payload);
 }
 
 function debugGetTableRows(phase, payload) {
-  if (!isDev()) return;
-  console.log('[db.getTableRows]', phase, payload);
+  logErpDebug(`DB_GET_ROWS_${phase}`, payload);
 }
 
 /**
@@ -511,7 +525,7 @@ export async function getTableRows(tableName) {
     logicalTable: tableName,
     resolvedTable: primaryName,
     candidates: candidateNames,
-    query: 'select id, created_at, sort_order, record; fallback select *',
+    query: 'select * ordered by sort_order/created_at; fallback select *',
     authUserId,
   });
 
@@ -520,7 +534,7 @@ export async function getTableRows(tableName) {
   for (const name of candidateNames) {
     const { data: rows, error } = await supabase
       .from(name)
-      .select('id, created_at, sort_order, record')
+      .select('*')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
 
@@ -531,7 +545,7 @@ export async function getTableRows(tableName) {
         logSupabaseDataDebug({
           operation: 'select',
           table: name,
-          query: 'select id, created_at, sort_order, record',
+          query: 'select * ordered by sort_order/created_at',
           rowCount: null,
           authUserId,
           error,
@@ -544,7 +558,7 @@ export async function getTableRows(tableName) {
         logSupabaseDataDebug({
           operation: 'select',
           table: name,
-          query: 'select id, created_at, sort_order, record',
+          query: 'select * ordered by sort_order/created_at',
           rowCount: null,
           authUserId,
           error,
@@ -588,7 +602,7 @@ export async function getTableRows(tableName) {
         authUserId,
         error: null,
       });
-      return (directRows || []).map(flattenDirectRow);
+      return (directRows || []).map(toErpCompatibleRow);
     }
 
     rememberResolvedTableName(primaryName, name);
@@ -596,15 +610,12 @@ export async function getTableRows(tableName) {
     logSupabaseDataDebug({
       operation: 'select',
       table: name,
-      query: 'select id, created_at, sort_order, record',
+      query: 'select * ordered by sort_order/created_at',
       rowCount: (rows || []).length,
       authUserId,
       error: null,
     });
-    return (rows || []).map((r) => ({
-      id: r.id,
-      ...(r.record || {}),
-    }));
+    return (rows || []).map(toErpCompatibleRow);
   }
 
   if (lastMissingTableError) {
@@ -640,7 +651,7 @@ export async function getTableRows(tableName) {
 export async function insertTableRow(tableName, row) {
   const primaryName = getTableName(tableName);
   const safeRow =
-    typeof row === 'object' && row !== null && !Array.isArray(row) ? { ...row } : {};
+    typeof row === 'object' && row !== null && !Array.isArray(row) ? toRecordPayload(row) : {};
 
   let lastMissingTableError = null;
   for (const name of getTableCandidateNames(tableName)) {
@@ -718,11 +729,12 @@ export async function insertTableRow(tableName, row) {
 export async function updateTableRowById(tableName, id, row) {
   const primaryName = getTableName(tableName);
   let lastMissingTableError = null;
+  const safeRecord = toRecordPayload(row);
 
   for (const name of getTableCandidateNames(tableName)) {
     const { error } = await supabase
       .from(name)
-      .update({ record: row || {} })
+      .update({ record: safeRecord })
       .eq('id', id);
 
     if (!error) {
@@ -738,7 +750,7 @@ export async function updateTableRowById(tableName, id, row) {
       throw error;
     }
 
-    const directPayload = row && typeof row === 'object' ? row : {};
+    const directPayload = safeRecord;
     const { error: directErr } = await supabase
       .from(name)
       .update(directPayload)
@@ -747,6 +759,19 @@ export async function updateTableRowById(tableName, id, row) {
     if (!directErr) {
       rememberResolvedTableName(primaryName, name);
       return;
+    }
+    if (isLegacyJsonSchemaError(directErr)) {
+      const keyColumns = getNaturalKeyColumns(directPayload, id);
+      for (const keyColumn of keyColumns) {
+        const { error: keyedErr } = await supabase
+          .from(name)
+          .update(directPayload)
+          .eq(keyColumn, id);
+        if (!keyedErr) {
+          rememberResolvedTableName(primaryName, name);
+          return;
+        }
+      }
     }
     if (isPostgrestMissingTableError(directErr)) {
       lastMissingTableError = directErr;
@@ -774,6 +799,30 @@ export async function deleteTableRowById(tableName, id) {
       rememberResolvedTableName(primaryName, name);
       return;
     }
+    if (isLegacyJsonSchemaError(error)) {
+      const keyColumns = [
+        'ClientCode',
+        'clientCode',
+        'clientcode',
+        'Vendor Code',
+        'VendorCode',
+        'UniqueId',
+        'DispatchUniqueId',
+        'POId',
+        'FlowId',
+        'LogId',
+        'EmployeeCode',
+        'ProductCode',
+        'Code',
+      ];
+      for (const keyColumn of keyColumns) {
+        const { error: keyedErr } = await supabase.from(name).delete().eq(keyColumn, id);
+        if (!keyedErr) {
+          rememberResolvedTableName(primaryName, name);
+          return;
+        }
+      }
+    }
     if (isPostgrestMissingTableError(error)) {
       lastMissingTableError = error;
       continue;
@@ -796,10 +845,8 @@ export async function updateRowByIndex(tableName, rowIndex, rowData) {
   const dataIndex = rowIndex - 2;
   const row = rows[dataIndex];
   if (!row?.id) throw new Error(`Row at index ${rowIndex} not found`);
-  const existing = { ...row };
-  delete existing.id;
-  const merged = { ...existing, ...(rowData || {}) };
-  delete merged.id;
+  const existing = toRecordPayload(row);
+  const merged = toRecordPayload({ ...existing, ...(rowData || {}) });
   await updateTableRowById(tableName, row.id, merged);
 }
 
@@ -823,7 +870,7 @@ export async function deleteRowByIndex(tableName, rowIndex) {
  */
 export async function getTableHeaders(tableName) {
   const data = await getTableRows(tableName);
-  return data.length > 0 ? Object.keys(data[0]).filter((k) => k !== 'id') : [];
+  return data.length > 0 ? Object.keys(data[0]).filter((k) => !ROW_METADATA_KEYS.has(k)) : [];
 }
 
 /**
@@ -838,7 +885,7 @@ export async function batchInsertTableRows(tableName, rows) {
   const normalizeRow = (row) =>
     Array.isArray(row)
       ? Object.fromEntries(row.map((v, j) => [`col_${j}`, v]))
-      : (row && typeof row === 'object' ? row : {});
+      : (row && typeof row === 'object' ? toRecordPayload(row) : {});
 
   let lastMissingTableError = null;
 

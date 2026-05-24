@@ -216,7 +216,7 @@ The system uses a single Google Spreadsheet with multiple sheets:
 ### 2. **OAuth Configuration**
 - **Provider**: Supabase Auth Google provider
 - **Redirect**: `window.location.origin`
-- **Environments**: Vercel Production, Preview, and Development use the same `REACT_APP_*` variables
+- **Environments**: Vercel Production, Preview, and Development use the same `VITE_*` variables
 
 ### 3. **Service Layer Architecture**
 Each business module has its own service:
@@ -249,7 +249,7 @@ npm run build
 4. Add the production Vercel URL to Supabase Redirect URLs
 
 ### 3. **OAuth Configuration**
-- Set `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`, and `REACT_APP_GOOGLE_OAUTH_CLIENT_ID`
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 - Configure these variables in Vercel for Production, Preview, and Development
 
 ### 4. **Sheet Initialization**

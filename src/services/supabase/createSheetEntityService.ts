@@ -10,19 +10,77 @@ import {
 type TableInsert = Database['public']['Tables'][SheetTableName]['Insert'];
 
 const LEGACY_ERR_MARKERS = ['sort_order', 'record'];
+const ROW_METADATA_KEYS = new Set(['id', 'created_at', 'updated_at', 'deleted_at', 'sort_order', 'record']);
 
 function isLegacySchemaError(err: PostgrestError): boolean {
   const m = String(err.message || '').toLowerCase();
   return LEGACY_ERR_MARKERS.some((k) => m.includes(k));
 }
 
+function isObjectRecord(value: Json | unknown): value is Record<string, Json> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseRecordValue(value: Json | unknown): Record<string, Json> {
+  if (isObjectRecord(value)) return value;
+  if (typeof value !== 'string' || value.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return isObjectRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function hasMeaningfulValue(value: Json | undefined): boolean {
+  return value != null && value !== '';
+}
+
+function getFlatFields(row: Record<string, unknown>): Record<string, Json> {
+  return Object.entries(row).reduce<Record<string, Json>>((acc, [key, value]) => {
+    if (!ROW_METADATA_KEYS.has(key) && value !== undefined) {
+      acc[key] = value as Json;
+    }
+    return acc;
+  }, {});
+}
+
+function getNaturalRowId(record: Record<string, Json>): string {
+  const value =
+    record.id ||
+    record.ClientCode ||
+    record.clientCode ||
+    record.clientcode ||
+    record['Vendor Code'] ||
+    record.VendorCode ||
+    record.UniqueId ||
+    record.DispatchUniqueId ||
+    record.POId ||
+    record.FlowId ||
+    record.LogId ||
+    record.EmployeeCode ||
+    record.ProductCode ||
+    record.Code ||
+    '';
+  return String(value || '');
+}
+
 function flattenRow(row: SheetEntityRow): FlattenedSheetRow {
-  const rec = row.record;
-  const flat =
-    rec && typeof rec === 'object' && !Array.isArray(rec)
-      ? (rec as Record<string, Json>)
-      : {};
-  return { id: row.id, ...flat };
+  const source = row as unknown as Record<string, unknown>;
+  const flat = getFlatFields(source);
+  const record = { ...flat };
+  Object.entries(parseRecordValue(source.record)).forEach(([key, value]) => {
+    if (hasMeaningfulValue(value) || !hasMeaningfulValue(record[key])) {
+      record[key] = value;
+    }
+  });
+  return {
+    ...record,
+    id: row.id || getNaturalRowId(record),
+    created_at: row.created_at,
+    sort_order: row.sort_order,
+    record,
+  };
 }
 
 /**
@@ -37,7 +95,7 @@ export function createSheetEntityService(tableName: SheetTableName) {
 
     async getAllRaw(): Promise<SheetResult<SheetEntityRow[]>> {
       const { data, error } = await from()
-        .select('id, created_at, sort_order, record')
+        .select('*')
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
 
@@ -63,7 +121,7 @@ export function createSheetEntityService(tableName: SheetTableName) {
 
     async getById(id: string): Promise<SheetResult<SheetEntityRow | null>> {
       const { data, error } = await from()
-        .select('id, created_at, sort_order, record')
+        .select('*')
         .eq('id', id)
         .maybeSingle();
 
